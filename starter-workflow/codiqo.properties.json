@@ -1,0 +1,7 @@
+{
+    "name": "Codiqo",
+    "description": "Analyze commit contribution and code quality with Codiqo, and submit results to your dashboard.",
+    "iconName": "activity",
+    "categories": ["Code quality", "Java"],
+    "filePatterns": ["pom\\.xml$"]
+}

@@ -1,0 +1,382 @@
+name: 'Codiqo Analyze'
+description: 'Score the engineering effort in your commits: builds each pending commit, resolves its call graph and submits the analysis to Codiqo.'
+author: 'Codiqo'
+branding:
+  icon: 'activity'
+  color: 'green'
+
+inputs:
+  # ---------------------------------------------------------------- identity and authentication
+  api-key:
+    description: 'Codiqo API key. Store it as a repository or organization secret and pass it here; it reaches Maven by environment reference, never on the command line.'
+    required: true
+  api-url:
+    description: 'Codiqo API base URL. Override only for a self-hosted Codiqo backend.'
+    required: false
+    default: 'https://api.codiqo.io'
+  branch:
+    description: 'Branch name to attribute the commit index to. Left empty the action derives it from the event (the head branch for pull requests), then falls back to letting the plugin auto-detect.'
+    required: false
+    default: ''
+
+  # ------------------------------------------------------------------------- versions and tooling
+  codiqo-version:
+    description: 'Version of io.codiqo:codiqo-maven-plugin to run. Codiqo is pre-1.0, so this defaults to a snapshot and the action adds a snapshot repository for it automatically (see manage-plugin-repository).'
+    required: false
+    default: '1.0-SNAPSHOT'
+  java-version:
+    description: 'JDK to install. Set to an empty string to skip JDK setup entirely, for example when the workflow already ran actions/setup-java or the runner has a pre-provisioned JDK. It must be able to build your project, and Codiqo needs Java 21 or newer for its language server.'
+    required: false
+    default: '21'
+  java-distribution:
+    description: 'Distribution passed to actions/setup-java.'
+    required: false
+    default: 'temurin'
+  java-home:
+    description: 'Explicit JDK home for the per-commit build and the language server (-Dcodiqo.javaHome). Left empty they inherit JAVA_HOME and the java on PATH.'
+    required: false
+    default: ''
+  maven-command:
+    description: 'Maven executable. "auto" prefers the project''s ./mvnw when present and executable, otherwise mvn. Give an explicit path to override. This action deliberately does not install Maven, so pin a version with your own step if you need one.'
+    required: false
+    default: 'auto'
+  maven-home:
+    description: 'Maven home for the forked per-commit build (-Dcodiqo.mavenHome).'
+    required: false
+    default: ''
+  jdtls-version:
+    description: 'Eclipse JDT language server version (-Dcodiqo.jdtlsVersion). Leave empty to use the version the plugin ships with.'
+    required: false
+    default: ''
+  cache:
+    description: 'Dependency cache for actions/setup-java ("maven", "gradle", or empty to disable). Disable it when an earlier step purges the local repository, or the restore will undo the purge.'
+    required: false
+    default: 'maven'
+
+  # ---------------------------------------------------------------------------- scope and filters
+  commit-window:
+    description: 'How far back to look for commits needing analysis. Accepts 0 (today only), 1m, 3m, 6m, 1year, or a raw ISO-8601 period such as P2W.'
+    required: false
+    default: '3m'
+  exclude-author-emails:
+    description: 'Comma-separated author emails to skip entirely; a trailing * is allowed, for example "bot@*". Useful for CI and bot accounts.'
+    required: false
+    default: ''
+  include-author-emails:
+    description: 'Comma-separated author emails to restrict analysis to. Empty means every author except those excluded.'
+    required: false
+    default: ''
+  first-parent-only:
+    description: 'Follow only the first parent, so a merge is measured as the change it brought to the target branch rather than as its whole side branch.'
+    required: false
+    default: 'true'
+  max-commits-per-run:
+    description: 'Upper bound on commits queued in one run. The real protection against a large backlog on first adoption.'
+    required: false
+    default: '1024'
+  index-batch-size:
+    description: 'How many commits are sent to the API per index request.'
+    required: false
+    default: '200'
+
+  # ------------------------------------------------------------------------------------ timeouts
+  per-commit-timeout:
+    description: 'Wall-clock limit for analysing one commit before it is killed. Accepts 30m, 1h, 90m, 2h, or a raw number of minutes. Keep it comfortably above build-timeout-minutes.'
+    required: false
+    default: '1h'
+  per-commit-timeout-minutes:
+    description: 'Deprecated: use per-commit-timeout, which also accepts plain minutes.'
+    required: false
+    default: ''
+    deprecationMessage: 'per-commit-timeout-minutes is deprecated; use per-commit-timeout.'
+  build-timeout-minutes:
+    description: 'Limit for the forked build of a single commit (-Dcodiqo.buildTimeoutMinutes).'
+    required: false
+    default: '60'
+  test-timeout-minutes:
+    description: 'Limit for the test phase of the forked build (-Dcodiqo.testTimeoutMinutes).'
+    required: false
+    default: '30'
+  per-test-timeout:
+    description: 'Limit for a single JUnit 5 test method, so one hanging test cannot fail the whole build. Accepts off, 5m, 10m, 15m, or raw minutes; the plugin caps it at 15 minutes. JUnit 4 and TestNG are unaffected.'
+    required: false
+    default: '15m'
+  import-timeout-minutes:
+    description: 'Limit for the language server to import the project (-Dcodiqo.importTimeoutMinutes). Raise it for a very large reactor.'
+    required: false
+    default: '15'
+  api-connect-timeout-seconds:
+    description: 'Connect timeout for Codiqo API calls.'
+    required: false
+    default: '30'
+  api-read-timeout-seconds:
+    description: 'Read timeout for Codiqo API calls.'
+    required: false
+    default: '60'
+
+  # -------------------------------------------------------------------------------- maven wiring
+  settings-xml:
+    description: 'Complete settings.xml content. Written to ~/.m2/settings.xml, the only location the language server''s embedded m2e reads: passing -s elsewhere does not reach it, and an m2e that cannot resolve your parent POMs yields an analysis with zero callers. Use this to supply private repositories and credentials.'
+    required: false
+    default: ''
+  maven-user-properties:
+    description: 'Newline-separated key=value pairs passed as -Dkey=value to every Maven invocation. Do not put secrets here, they would appear on the command line; use settings-xml instead.'
+    required: false
+    default: ''
+  maven-args:
+    description: 'Extra Maven arguments, one per line. A single-line value is split on whitespace for convenience.'
+    required: false
+    default: ''
+  maven-opts:
+    description: 'Value for MAVEN_OPTS. The forked per-commit build inherits it, so size any -Xmx with several concurrent JVMs in mind.'
+    required: false
+    default: ''
+  maven-parallelism:
+    description: 'Value for Maven -T on the per-commit build, for example 1C. It propagates into the forked build.'
+    required: false
+    default: ''
+  manage-plugin-repository:
+    description: 'Whether the action may add a repository able to serve the Codiqo plugin: auto (only for a -SNAPSHOT codiqo-version), always, or never.'
+    required: false
+    default: 'auto'
+  plugin-repository-url:
+    description: 'Repository used to resolve the Codiqo plugin and its core extension when the action manages repositories.'
+    required: false
+    default: 'https://central.sonatype.com/repository/maven-snapshots'
+  time-machine-repositories:
+    description: 'Additional id=url lines, one per line, added to the throwaway POM that resolves the time-machine extension. Credentials come from settings-xml, matched by repository id.'
+    required: false
+    default: ''
+
+  # ----------------------------------------------------------------------------------- behaviour
+  score-on-build-failure:
+    description: 'Score a commit from its diff alone when its build fails, instead of excluding it. The result carries a capped quality multiplier.'
+    required: false
+    default: 'false'
+  exclude-reverted-commits:
+    description: 'When a revert is analysed, also retroactively exclude the commit it reverted, so reverted work stops counting.'
+    required: false
+    default: 'true'
+  ignore-coverage:
+    description: 'Skip tests in the forked build. Much faster and useful for a first trial, but produces no coverage data.'
+    required: false
+    default: 'false'
+  time-machine:
+    description: 'Load the Codiqo time-machine core extension into the host Maven, so a historical commit resolves the snapshot dependencies it had at the time rather than the latest ones.'
+    required: false
+    default: 'true'
+  dump-analysis:
+    description: 'Keep the analysis document alongside the submission for debugging.'
+    required: false
+    default: 'true'
+  fail-fast:
+    description: 'Stop at the first commit that fails. Turn it off to attempt every commit and fail the step at the end.'
+    required: false
+    default: 'true'
+  require-full-history:
+    description: 'Fail early on a shallow or partially-cloned repository. Codiqo skips commits whose parent is missing locally, so without this a run can report success having analysed nothing.'
+    required: false
+    default: 'true'
+
+  # ------------------------------------------------------------------------------- observability
+  heartbeat-interval-seconds:
+    description: 'How often to print a status line while a Maven step runs quietly into its log file. Keeps a long job visibly alive and records a memory and CPU trend.'
+    required: false
+    default: '30'
+  maven-step-tail-lines:
+    description: 'How many log lines to echo when a step fails.'
+    required: false
+    default: '400'
+  upload-logs:
+    description: 'Upload the per-step and per-commit logs as a build artifact.'
+    required: false
+    default: 'true'
+  log-artifact-name:
+    description: 'Artifact name for the logs. Override it when several jobs in one workflow run this action, since artifact names must be unique.'
+    required: false
+    default: 'codiqo-analyze-logs'
+  log-retention-days:
+    description: 'Retention for the log artifact.'
+    required: false
+    default: '7'
+  redact-env-names:
+    description: 'Newline or comma separated names of environment variables whose values must be scrubbed from the logs before upload. GitHub masks secrets in the live log only; artifact bytes are uploaded verbatim. Set those variables at job level so this action can see them.'
+    required: false
+    default: ''
+  log-commit-authors:
+    description: 'Include commit author names and emails in the log. Off by default because the logs are uploaded as an artifact.'
+    required: false
+    default: 'false'
+
+outputs:
+  missing-count:
+    description: 'Number of commits that needed analysis.'
+    value: ${{ steps.index.outputs.missing-count }}
+  analysed-count:
+    description: 'Number of commits analysed and submitted successfully.'
+    value: ${{ steps.submit.outputs.analysed-count }}
+  failed-count:
+    description: 'Number of commits that failed.'
+    value: ${{ steps.submit.outputs.failed-count }}
+  missing-file:
+    description: 'Path to the file listing the commits that needed analysis, oldest first.'
+    value: ${{ steps.index.outputs.missing-file }}
+  logs-dir:
+    description: 'Directory holding the step and per-commit logs.'
+    value: ${{ runner.temp }}/step-logs
+
+runs:
+  using: 'composite'
+  steps:
+    #
+    # Everything is validated and normalised once, here, so the later steps are straight-line.
+    # This is also where a shallow clone is rejected — before an hour of build time is spent on
+    # a run that would have silently analysed nothing.
+    #
+    - name: Resolve Codiqo configuration
+      id: cfg
+      shell: bash
+      run: "$GITHUB_ACTION_PATH/scripts/resolve-config.sh"
+      env:
+        CODIQO_IN_VERSION: ${{ inputs.codiqo-version }}
+        CODIQO_IN_API_URL: ${{ inputs.api-url }}
+        CODIQO_IN_BRANCH: ${{ inputs.branch }}
+        CODIQO_IN_COMMIT_WINDOW: ${{ inputs.commit-window }}
+        CODIQO_IN_PER_COMMIT_TIMEOUT: ${{ inputs.per-commit-timeout }}
+        CODIQO_IN_PER_COMMIT_TIMEOUT_MINUTES: ${{ inputs.per-commit-timeout-minutes }}
+        CODIQO_IN_PER_TEST_TIMEOUT: ${{ inputs.per-test-timeout }}
+        CODIQO_IN_MAVEN_COMMAND: ${{ inputs.maven-command }}
+        CODIQO_IN_MAVEN_ARGS: ${{ inputs.maven-args }}
+        CODIQO_IN_MAVEN_USER_PROPERTIES: ${{ inputs.maven-user-properties }}
+        CODIQO_IN_MAVEN_OPTS: ${{ inputs.maven-opts }}
+        CODIQO_IN_REQUIRE_FULL_HISTORY: ${{ inputs.require-full-history }}
+        CODIQO_IN_HEARTBEAT_INTERVAL: ${{ inputs.heartbeat-interval-seconds }}
+        CODIQO_IN_TAIL_LINES: ${{ inputs.maven-step-tail-lines }}
+
+    - name: Set up JDK ${{ inputs.java-version }}
+      if: inputs.java-version != ''
+      uses: actions/setup-java@v5
+      with:
+        java-version: ${{ inputs.java-version }}
+        distribution: ${{ inputs.java-distribution }}
+        cache: ${{ inputs.cache }}
+
+    #
+    # The language server archive is fetched once and reused, so caching it removes a download
+    # from every run. Small and immutable, unlike the language server's own index.
+    #
+    - name: Cache the Codiqo language server download
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/fetch
+        key: codiqo-fetch-${{ runner.os }}-${{ inputs.codiqo-version }}-${{ inputs.jdtls-version }}
+        restore-keys: |
+          codiqo-fetch-${{ runner.os }}-
+
+    #
+    # Must run after setup-java, which writes its own ~/.m2/settings.xml when given a server-id.
+    #
+    - name: Configure Maven settings
+      shell: bash
+      run: "$GITHUB_ACTION_PATH/scripts/prepare-maven.sh"
+      env:
+        CODIQO_IN_VERSION: ${{ inputs.codiqo-version }}
+        CODIQO_IN_SETTINGS_XML: ${{ inputs.settings-xml }}
+        CODIQO_IN_MANAGE_PLUGIN_REPOSITORY: ${{ inputs.manage-plugin-repository }}
+        CODIQO_IN_PLUGIN_REPOSITORY_URL: ${{ inputs.plugin-repository-url }}
+
+    - name: Index commits
+      id: index
+      shell: bash
+      run: "$GITHUB_ACTION_PATH/scripts/index-commits.sh"
+      env:
+        CODIQO_API_KEY: ${{ inputs.api-key }}
+        CODIQO_IN_VERSION: ${{ inputs.codiqo-version }}
+        CODIQO_IN_API_URL: ${{ inputs.api-url }}
+        CODIQO_IN_EXCLUDE_AUTHOR_EMAILS: ${{ inputs.exclude-author-emails }}
+        CODIQO_IN_INCLUDE_AUTHOR_EMAILS: ${{ inputs.include-author-emails }}
+        CODIQO_IN_FIRST_PARENT_ONLY: ${{ inputs.first-parent-only }}
+        CODIQO_IN_MAX_COMMITS: ${{ inputs.max-commits-per-run }}
+        CODIQO_IN_INDEX_BATCH_SIZE: ${{ inputs.index-batch-size }}
+        CODIQO_IN_API_CONNECT_TIMEOUT: ${{ inputs.api-connect-timeout-seconds }}
+        CODIQO_IN_API_READ_TIMEOUT: ${{ inputs.api-read-timeout-seconds }}
+
+    #
+    # Skipped when nothing is pending, so a quiet repository costs no resolution round-trip.
+    #
+    - name: Prepare the time-machine host extension
+      if: inputs.time-machine == 'true' && steps.index.outputs.missing-count != '0'
+      shell: bash
+      run: "$GITHUB_ACTION_PATH/scripts/prepare-time-machine.sh"
+      env:
+        CODIQO_IN_VERSION: ${{ inputs.codiqo-version }}
+        CODIQO_IN_PLUGIN_REPOSITORY_URL: ${{ inputs.plugin-repository-url }}
+        CODIQO_IN_TIME_MACHINE_REPOSITORIES: ${{ inputs.time-machine-repositories }}
+
+    - name: Submit commit analyses
+      id: submit
+      if: steps.index.outputs.missing-count != '0'
+      shell: bash
+      run: "$GITHUB_ACTION_PATH/scripts/submit-analyses.sh"
+      env:
+        CODIQO_API_KEY: ${{ inputs.api-key }}
+        CODIQO_IN_VERSION: ${{ inputs.codiqo-version }}
+        CODIQO_IN_API_URL: ${{ inputs.api-url }}
+        CODIQO_IN_EXCLUDE_AUTHOR_EMAILS: ${{ inputs.exclude-author-emails }}
+        CODIQO_IN_INCLUDE_AUTHOR_EMAILS: ${{ inputs.include-author-emails }}
+        CODIQO_IN_FIRST_PARENT_ONLY: ${{ inputs.first-parent-only }}
+        CODIQO_IN_SCORE_ON_BUILD_FAILURE: ${{ inputs.score-on-build-failure }}
+        CODIQO_IN_EXCLUDE_REVERTED_COMMITS: ${{ inputs.exclude-reverted-commits }}
+        CODIQO_IN_IGNORE_COVERAGE: ${{ inputs.ignore-coverage }}
+        CODIQO_IN_TIME_MACHINE: ${{ inputs.time-machine }}
+        CODIQO_IN_DUMP_ANALYSIS: ${{ inputs.dump-analysis }}
+        CODIQO_IN_FAIL_FAST: ${{ inputs.fail-fast }}
+        CODIQO_IN_LOG_COMMIT_AUTHORS: ${{ inputs.log-commit-authors }}
+        CODIQO_IN_JAVA_HOME: ${{ inputs.java-home }}
+        CODIQO_IN_MAVEN_HOME: ${{ inputs.maven-home }}
+        CODIQO_IN_MAVEN_PARALLELISM: ${{ inputs.maven-parallelism }}
+        CODIQO_IN_JDTLS_VERSION: ${{ inputs.jdtls-version }}
+        CODIQO_IN_BUILD_TIMEOUT_MINUTES: ${{ inputs.build-timeout-minutes }}
+        CODIQO_IN_TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
+        CODIQO_IN_IMPORT_TIMEOUT_MINUTES: ${{ inputs.import-timeout-minutes }}
+        CODIQO_IN_API_CONNECT_TIMEOUT: ${{ inputs.api-connect-timeout-seconds }}
+        CODIQO_IN_API_READ_TIMEOUT: ${{ inputs.api-read-timeout-seconds }}
+
+    #
+    # always(): the three closing steps must run even when submission failed, because that is
+    # exactly when the logs are wanted. Composite actions support neither continue-on-error nor
+    # steps.<id>.outcome, so redaction reports its own failure as a warning rather than a status.
+    #
+    - name: Redact secrets from the logs
+      if: always()
+      shell: bash
+      run: |
+        python3 "$GITHUB_ACTION_PATH/scripts/redact-logs.py" \
+          || echo "::warning::log redaction failed; the ${{ inputs.log-artifact-name }} artifact may contain unredacted secrets"
+      env:
+        CODIQO_API_KEY: ${{ inputs.api-key }}
+        CODIQO_SETTINGS_XML: ${{ inputs.settings-xml }}
+        CODIQO_REDACT_ENV_NAMES: ${{ inputs.redact-env-names }}
+        # set explicitly rather than relying on the GITHUB_ENV export from the first step:
+        # this step runs under always(), including when configuration resolution failed
+        CODIQO_LOGS_DIR: ${{ runner.temp }}/step-logs
+
+    - name: Upload Codiqo logs
+      if: always() && inputs.upload-logs == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.log-artifact-name }}
+        path: ${{ runner.temp }}/step-logs/
+        retention-days: ${{ inputs.log-retention-days }}
+        if-no-files-found: ignore
+
+    - name: Write the job summary
+      if: always()
+      shell: bash
+      run: "$GITHUB_ACTION_PATH/scripts/summary.sh"
+      env:
+        CODIQO_IN_VERSION: ${{ inputs.codiqo-version }}
+        CODIQO_IN_LOG_ARTIFACT_NAME: ${{ inputs.log-artifact-name }}
+        CODIQO_SUMMARY_MISSING: ${{ steps.index.outputs.missing-count }}
+        CODIQO_SUMMARY_ANALYSED: ${{ steps.submit.outputs.analysed-count }}
+        CODIQO_SUMMARY_FAILED: ${{ steps.submit.outputs.failed-count }}

@@ -1,0 +1,83 @@
+# Analysing a project whose dependencies come from a private Maven registry.
+#
+# The settings-xml input is the whole story. It is written to ~/.m2/settings.xml because the
+# language server's embedded m2e is a separate process that reads only that path — and an m2e
+# that cannot resolve your parent POMs produces an analysis with zero callers rather than an
+# error, which is why the profile below carries properties, repositories AND pluginRepositories.
+name: Codiqo
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: codiqo
+  cancel-in-progress: false
+
+env:
+  REGISTRY_URL: https://maven.example.com/repository/releases
+  # Named in redact-env-names below. Job- or workflow-level env is visible to the action's
+  # shells; a step-level env on the `uses:` step is not guaranteed to be.
+  REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: codiqo/codiqo-action@main
+        with:
+          api-key: ${{ secrets.CODIQO_API_KEY }}
+          java-version: '21'
+
+          # Properties your POMs interpolate. These reach the host Maven; the profile below is
+          # what carries them into m2e and into the forked per-commit build.
+          maven-user-properties: |
+            my.registry.url=${{ env.REGISTRY_URL }}
+
+          settings-xml: |
+            <settings>
+              <servers>
+                <server>
+                  <id>my-registry</id>
+                  <username>${{ secrets.REGISTRY_USER }}</username>
+                  <password><![CDATA[${{ secrets.REGISTRY_TOKEN }}]]></password>
+                </server>
+              </servers>
+              <profiles>
+                <profile>
+                  <id>my-registry</id>
+                  <properties>
+                    <my.registry.url>${{ env.REGISTRY_URL }}</my.registry.url>
+                  </properties>
+                  <repositories>
+                    <repository>
+                      <id>my-registry</id>
+                      <url>${{ env.REGISTRY_URL }}</url>
+                      <releases><enabled>true</enabled></releases>
+                      <snapshots><enabled>true</enabled></snapshots>
+                    </repository>
+                  </repositories>
+                  <pluginRepositories>
+                    <pluginRepository>
+                      <id>my-registry</id>
+                      <url>${{ env.REGISTRY_URL }}</url>
+                      <releases><enabled>true</enabled></releases>
+                      <snapshots><enabled>true</enabled></snapshots>
+                    </pluginRepository>
+                  </pluginRepositories>
+                </profile>
+              </profiles>
+              <activeProfiles>
+                <activeProfile>my-registry</activeProfile>
+              </activeProfiles>
+            </settings>
+
+          # Logs are uploaded as an artifact, and GitHub only masks secrets in the live log.
+          redact-env-names: |
+            REGISTRY_TOKEN

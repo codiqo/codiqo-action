@@ -1,0 +1,33 @@
+# Copy this file to .github/workflows/codiqo.yml in your repository.
+#
+# Prerequisites:
+#   1. A Maven project.
+#   2. A repository secret named CODIQO_API_KEY (get a key at https://app.codiqo.io).
+name: Codiqo
+
+on:
+  # A schedule rather than a push trigger: analysing a commit means building it, which takes
+  # minutes, so decoupling from pushes keeps the queue orderly and catches up on its own.
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+# One analysis at a time. cancel-in-progress: false lets the running one finish and makes the
+# newcomer wait, rather than killing an hour of build work.
+concurrency:
+  group: codiqo
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # required: Codiqo skips commits whose parent is missing locally
+
+      - uses: codiqo/codiqo-action@main
+        with:
+          api-key: ${{ secrets.CODIQO_API_KEY }}
+          java-version: '21'   # match your project's build JDK

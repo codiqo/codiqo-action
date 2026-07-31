@@ -1,0 +1,11 @@
+version: 2
+updates:
+  # This action pins other actions by major tag. Dependabot keeps those majors current so a
+  # deprecated runtime (the usual reason a major is retired) surfaces as a PR rather than as a
+  # broken run in somebody else's repository.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'ci'

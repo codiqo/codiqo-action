@@ -1,0 +1,53 @@
+name: Release
+
+# Consumers reference a moving major (@v0 while pre-1.0, @v1 afterwards), so publishing v0.4.0 has
+# to repoint that tag at the new commit. Done with plain git rather than a third-party action, to
+# keep this repository's own supply chain empty.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  move-major-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sanity-check the action before advertising it
+        run: |
+          set -euo pipefail
+          test -f action.yml
+          python3 -c "import sys; sys.exit(0)"
+          for f in scripts/*.sh; do bash -n "$f"; done
+          python3 -m py_compile scripts/*.py
+          echo "ok"
+
+      - name: Move the major tag
+        run: |
+          set -euo pipefail
+          major="${GITHUB_REF_NAME%%.*}"     # v1.2.3 -> v1
+          echo "pointing $major at $GITHUB_SHA ($GITHUB_REF_NAME)"
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -f "$major" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$major"
+
+      # v0.x is marked as a pre-release, so the repository's "latest release" badge does not
+      # advertise an unstable input surface as ready.
+      - name: Publish a GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          prerelease=""
+          case "$GITHUB_REF_NAME" in
+            v0.*) prerelease="--prerelease" ;;
+          esac
+          # shellcheck disable=SC2086 # intentional: empty expands to no flag
+          gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag $prerelease

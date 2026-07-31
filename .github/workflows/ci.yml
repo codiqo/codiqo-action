@@ -1,0 +1,190 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # actionlint is fetched as a pinned release binary rather than via a third-party action:
+      # a public action should not push its own supply chain onto every consumer's audit.
+      - name: actionlint
+        env:
+          ACTIONLINT_VERSION: '1.7.7'
+        run: |
+          set -euo pipefail
+          curl -fsSL -o actionlint.tgz \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          tar -xzf actionlint.tgz actionlint
+          ./actionlint -color
+
+      - name: shellcheck
+        run: shellcheck --severity=style scripts/*.sh
+
+      - name: bash syntax
+        run: |
+          set -euo pipefail
+          for f in scripts/*.sh; do bash -n "$f"; done
+
+      - name: python syntax
+        run: python3 -m py_compile scripts/*.py
+
+      - name: action.yml parses and is internally consistent
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re, pathlib, sys
+          import xml.etree.ElementTree  # noqa: F401  (stdlib availability check for the merge script)
+          body = pathlib.Path("action.yml").read_text()
+
+          def declared_inputs(text):
+              """Keys inside the top-level inputs: block only.
+
+              A bare `^  (\\w+):` regex would also pick up outputs: keys and runs.steps, so walk
+              from the inputs: line to the next column-zero key instead.
+              """
+              names, inside = [], False
+              for line in text.splitlines():
+                  if re.match(r"^[a-z]", line):
+                      inside = line.startswith("inputs:")
+                      continue
+                  if inside:
+                      hit = re.match(r"^  ([a-z0-9-]+):$", line)
+                      if hit:
+                          names.append(hit.group(1))
+              return set(names)
+
+          # every inputs.<name> reference must be a declared input, and vice versa
+          declared = declared_inputs(body)
+          used = set(re.findall(r"inputs\.([a-z0-9-]+)", body))
+          problems = []
+          if used - declared:
+              problems.append(f"referenced but not declared: {sorted(used - declared)}")
+          if declared - used:
+              problems.append(f"declared but never used: {sorted(declared - used)}")
+          # every CODIQO_IN_* the scripts read must be set somewhere in action.yml
+          set_here = set(re.findall(r"^\s+(CODIQO_[A-Z0-9_]+):", body, re.M))
+          read = set()
+          for p in pathlib.Path("scripts").iterdir():
+              t = p.read_text()
+              read |= set(re.findall(r"\$\{(CODIQO_IN_[A-Z0-9_]+)", t))
+          if read - set_here:
+              problems.append(f"scripts read env never set by action.yml: {sorted(read - set_here)}")
+          if problems:
+              print("\n".join(problems)); sys.exit(1)
+          print(f"ok: {len(declared)} inputs, {len(read)} script env vars wired")
+          PY
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Docs drift is the failure mode nobody notices: an input added without a README row is
+      # invisible to users, so make it a build failure instead.
+      - name: every input is documented in the README
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re, pathlib, sys
+          action = pathlib.Path("action.yml").read_text()
+          readme = pathlib.Path("README.md").read_text()
+          # scoped to the inputs: block; outputs: and runs.steps keys are not inputs
+          inputs, inside = [], False
+          for line in action.splitlines():
+              if re.match(r"^[a-z]", line):
+                  inside = line.startswith("inputs:")
+                  continue
+              if inside:
+                  hit = re.match(r"^  ([a-z0-9-]+):$", line)
+                  if hit:
+                      inputs.append(hit.group(1))
+          missing = [name for name in inputs if f"`{name}`" not in readme]
+          if missing:
+              print("inputs missing from README:", missing); sys.exit(1)
+          print(f"ok: all {len(inputs)} inputs documented")
+          PY
+
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The shorthand mappings are the action's compatibility contract: callers pass '3m' and
+      # '1h' from dropdowns, and ISO-8601 parsing of '3m' would throw at the plugin.
+      - name: shorthand mapping
+        run: |
+          set -euo pipefail
+          export GITHUB_ACTION_PATH="$PWD" RUNNER_TEMP="$(mktemp -d)"
+          # Captured into a variable rather than piped: `... | grep -q` makes grep exit on the
+          # first match, the producer takes SIGPIPE, and under pipefail the pipeline reports 141
+          # even though the assertion passed.
+          probe() {
+            CODIQO_IN_VERSION=1.0-SNAPSHOT CODIQO_IN_COMMIT_WINDOW="$1" \
+            CODIQO_IN_PER_COMMIT_TIMEOUT="$2" CODIQO_IN_PER_TEST_TIMEOUT="$3" \
+              ./scripts/resolve-config.sh 2>&1 || true
+          }
+          expect() {
+            local out
+            out="$(probe "$1" "$2" "$3")"
+            case "$out" in
+              *"$4"*) ;;
+              *) echo "FAIL: window=$1 commit=$2 test=$3 did not yield '$4'"; echo "$out"; exit 1 ;;
+            esac
+          }
+          expect 0      1h 15m 'commit window    : P0D'
+          expect 1m     1h 15m 'commit window    : P1M'
+          expect 3m     1h 15m 'commit window    : P3M'
+          expect 6m     1h 15m 'commit window    : P6M'
+          expect 1year  1h 15m 'commit window    : P1Y'
+          expect P2W    1h 15m 'commit window    : P2W'
+          expect 3m    30m 15m 'per-commit limit : 30m'
+          expect 3m     2h 15m 'per-commit limit : 120m'
+          expect 3m     45 15m 'per-commit limit : 45m'
+          expect 3m     1h off 'per-test limit   : 0m'
+          expect 3m     1h  5m 'per-test limit   : 5m'
+          # and invalid values must be rejected, not silently defaulted
+          reject() {
+            local out
+            out="$(probe "$1" "$2" "$3")"
+            case "$out" in
+              *'::error::'*) ;;
+              *) echo "FAIL: window=$1 commit=$2 test=$3 was accepted"; echo "$out"; exit 1 ;;
+            esac
+          }
+          reject zzz 1h  15m
+          reject 3m  3days 15m
+          reject 3m  1h  -5
+          echo "ok: shorthand mappings and rejections behave"
+
+      - name: settings.xml merge is idempotent and preserves the caller's profiles
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          cat > "$work/settings.xml" <<'XML'
+          <settings>
+            <servers><server><id>mine</id><username>u</username></server></servers>
+            <profiles><profile><id>mine</id></profile></profiles>
+            <activeProfiles><activeProfile>mine</activeProfile></activeProfiles>
+          </settings>
+          XML
+          url=https://central.sonatype.com/repository/maven-snapshots
+          python3 scripts/inject-plugin-repository.py "$work/settings.xml" "$url"
+          python3 scripts/inject-plugin-repository.py "$work/settings.xml" "$url" | grep -q 'already present'
+          xmllint --noout "$work/settings.xml"
+          test "$(xmllint --xpath "count(//server[id='mine'])" "$work/settings.xml")" = 1
+          test "$(xmllint --xpath "count(//profile[id='mine'])" "$work/settings.xml")" = 1
+          test "$(xmllint --xpath "count(//pluginRepository[id='central-snapshots'])" "$work/settings.xml")" = 1
+          # a malformed file must fail loudly rather than be silently rewritten
+          printf '<settings><oops>\n' > "$work/bad.xml"
+          if python3 scripts/inject-plugin-repository.py "$work/bad.xml" "$url"; then
+            echo "FAIL: malformed settings.xml was accepted"; exit 1
+          fi
+          echo "ok: settings.xml merge behaves"

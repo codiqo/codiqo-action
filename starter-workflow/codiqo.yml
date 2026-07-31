@@ -1,0 +1,27 @@
+# Codiqo — measure the engineering effort behind your commits.
+# Docs: https://github.com/codiqo/codiqo-action
+# Setup: add a repository secret CODIQO_API_KEY (get a key at https://app.codiqo.io).
+name: Codiqo
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: codiqo
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: codiqo/codiqo-action@main
+        with:
+          api-key: ${{ secrets.CODIQO_API_KEY }}
+          java-version: '21'

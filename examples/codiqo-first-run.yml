@@ -1,0 +1,40 @@
+# A cautious first run: prove the wiring works before committing hours of build time.
+#
+# Two deliberate compromises make this fast:
+#   - ignore-coverage skips tests in the per-commit build, so no coverage data is produced
+#   - max-commits-per-run caps the backlog to a couple of commits
+#
+# Once a run comes back with a non-zero caller count, drop both and switch to the schedule in
+# examples/codiqo.yml.
+name: Codiqo (first run)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: codiqo
+        uses: codiqo/codiqo-action@main
+        with:
+          api-key: ${{ secrets.CODIQO_API_KEY }}
+          java-version: '21'
+          commit-window: 'P7D'
+          max-commits-per-run: 2
+          ignore-coverage: true
+          per-commit-timeout: '90m'
+
+      # The number that matters. A completed analysis reporting zero callers means the language
+      # server found no Java model — usually a settings.xml or parent-POM resolution problem.
+      - name: Report what happened
+        if: always()
+        run: |
+          echo "pending  : ${{ steps.codiqo.outputs.missing-count }}"
+          echo "analysed : ${{ steps.codiqo.outputs.analysed-count }}"
+          echo "failed   : ${{ steps.codiqo.outputs.failed-count }}"
