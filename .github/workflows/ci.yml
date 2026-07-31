@@ -177,7 +177,13 @@ jobs:
           XML
           url=https://central.sonatype.com/repository/maven-snapshots
           python3 scripts/inject-plugin-repository.py "$work/settings.xml" "$url"
-          python3 scripts/inject-plugin-repository.py "$work/settings.xml" "$url" | grep -q 'already present'
+          # Captured rather than piped into `grep -q`, for the reason given in the shorthand
+          # mapping step above: the reader would exit first and fail the pipeline with 141.
+          second="$(python3 scripts/inject-plugin-repository.py "$work/settings.xml" "$url")"
+          case "$second" in
+            *'already present'*) ;;
+            *) echo "FAIL: second injection did not report 'already present'"; echo "$second"; exit 1 ;;
+          esac
           xmllint --noout "$work/settings.xml"
           test "$(xmllint --xpath "count(//server[id='mine'])" "$work/settings.xml")" = 1
           test "$(xmllint --xpath "count(//profile[id='mine'])" "$work/settings.xml")" = 1

@@ -93,9 +93,17 @@ codiqo::_mem_summary() {
     fi
 }
 
+#
+# Largest process by resident set. Picks the maximum in a single awk pass rather than
+# `sort -k2 -n -r | head -1`: `head` closes the pipe after one line, and because the
+# Actions runner leaves SIGPIPE ignored, children inherit SIG_IGN and sort reports
+# "fflush failed: 'standard output': Broken pipe" into the step log instead of dying
+# silently on the signal.
+#
 codiqo::_top_process() {
-    ps -eo comm=,rss= 2>/dev/null | sort -k2 -n -r | head -1 |
-        awk '{printf "top: %s %.1fG", $1, $2/1048576}'
+    ps -eo comm=,rss= 2>/dev/null |
+        awk '$NF + 0 > max { max = $NF + 0; name = $1 }
+             END { if (name != "") printf "top: %s %.1fG", name, max / 1048576 }'
 }
 
 codiqo::_load_average() {
