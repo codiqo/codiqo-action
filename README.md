@@ -114,6 +114,7 @@ The action is incremental: commits already scored are skipped, so a schedule sim
 | `manage-plugin-repository` | `auto` | `auto` (snapshot versions only), `always`, `never`. |
 | `plugin-repository-url` | Central snapshots | Where the plugin and its extension are resolved from. |
 | `time-machine-repositories` | `''` | Extra `id=url` lines for resolving the extension privately. |
+| `resolve-dependencies` | `false` | Run `dependency:go-offline` once up front to warm the local repository. Off by default: `go-offline` misses plugin-only dependencies and fails on some reactors. |
 
 ### Behaviour
 

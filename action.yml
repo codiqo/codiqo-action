@@ -147,6 +147,10 @@ inputs:
     description: 'Additional id=url lines, one per line, added to the throwaway POM that resolves the time-machine extension. Credentials come from settings-xml, matched by repository id.'
     required: false
     default: ''
+  resolve-dependencies:
+    description: 'Run dependency:go-offline once before analysing, to warm the local repository and surface an unreachable repository as one clear failure. Off by default because go-offline is imperfect: it misses dependencies reachable only through a plugin, and some reactors make it fail outright.'
+    required: false
+    default: 'false'
 
   # ----------------------------------------------------------------------------------- behaviour
   score-on-build-failure:
@@ -284,6 +288,14 @@ runs:
         CODIQO_IN_SETTINGS_XML: ${{ inputs.settings-xml }}
         CODIQO_IN_MANAGE_PLUGIN_REPOSITORY: ${{ inputs.manage-plugin-repository }}
         CODIQO_IN_PLUGIN_REPOSITORY_URL: ${{ inputs.plugin-repository-url }}
+
+    #
+    # After the settings are in place, before anything else touches Maven.
+    #
+    - name: Resolve dependencies
+      if: inputs.resolve-dependencies == 'true'
+      shell: bash
+      run: "$GITHUB_ACTION_PATH/scripts/resolve-dependencies.sh"
 
     - name: Index commits
       id: index
