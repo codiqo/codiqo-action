@@ -125,7 +125,7 @@ The action is incremental: commits already scored are skipped, so a schedule sim
 | `ignore-coverage` | `false` | Skip tests in the forked build. Much faster, no coverage data. |
 | `time-machine` | `true` | Resolve a historical commit's snapshot dependencies as of that commit. |
 | `dump-analysis` | `true` | Keep the analysis document for debugging. |
-| `fail-fast` | `true` | Stop at the first failing commit. |
+| `stop-on-first-failure` | `true` | Stop at the first commit that genuinely fails to analyse (timeout, OOM, failed analysis run). Commits codiqo excludes do not count. |
 | `require-full-history` | `true` | Refuse to run on a shallow or filtered clone. |
 
 ### Observability

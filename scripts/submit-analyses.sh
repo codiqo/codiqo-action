@@ -107,10 +107,10 @@ for commit in "${commits[@]}"; do
     fi
     codiqo::tail_log "$log"
 
-    if [ "${CODIQO_IN_FAIL_FAST:-true}" = "true" ]; then
+    if [ "${CODIQO_IN_STOP_ON_FIRST_FAILURE:-true}" = "true" ]; then
         codiqo::output "analysed-count" "$analysed"
         codiqo::output "failed-count" "$failed"
-        codiqo::log "stopping after the first failure (fail-fast). $((total - index)) commit(s) left unattempted."
+        codiqo::log "stopping after the first failure. $((total - index)) commit(s) left unattempted."
         exit 1
     fi
 done
@@ -120,7 +120,7 @@ codiqo::output "failed-count" "$failed"
 codiqo::log "submitted $analysed of $total analyses in $(($(date +%s) - loop_start))s ($failed failed)."
 
 #
-# With fail-fast off the loop keeps going, but the step still has to report the truth.
+# With stop-on-first-failure off the loop keeps going, but the step still has to report the truth.
 #
 if [ "$failed" -gt 0 ]; then
     exit 1

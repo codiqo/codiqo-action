@@ -173,8 +173,8 @@ inputs:
     description: 'Keep the analysis document alongside the submission for debugging.'
     required: false
     default: 'true'
-  fail-fast:
-    description: 'Stop at the first commit that fails. Turn it off to attempt every commit and fail the step at the end.'
+  stop-on-first-failure:
+    description: 'Stop at the first commit that genuinely fails to analyse — a timeout, an out-of-memory kill, or a build failure of the analysis run itself. A commit codiqo excludes (unresolvable historical dependency, build failure of the analysed commit, no analyzable diff) is a normal outcome and never trips this. Turn it off to attempt every commit and fail the step at the end.'
     required: false
     default: 'true'
   require-full-history:
@@ -342,7 +342,7 @@ runs:
         CODIQO_IN_IGNORE_COVERAGE: ${{ inputs.ignore-coverage }}
         CODIQO_IN_TIME_MACHINE: ${{ inputs.time-machine }}
         CODIQO_IN_DUMP_ANALYSIS: ${{ inputs.dump-analysis }}
-        CODIQO_IN_FAIL_FAST: ${{ inputs.fail-fast }}
+        CODIQO_IN_STOP_ON_FIRST_FAILURE: ${{ inputs.stop-on-first-failure }}
         CODIQO_IN_LOG_COMMIT_AUTHORS: ${{ inputs.log-commit-authors }}
         CODIQO_IN_JAVA_HOME: ${{ inputs.java-home }}
         CODIQO_IN_MAVEN_HOME: ${{ inputs.maven-home }}

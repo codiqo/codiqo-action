@@ -229,12 +229,22 @@ codiqo::assert_build_success() {
         printf 'failed with exit %s' "$rc"
         return 1
     fi
-    if grep -q 'BUILD FAILURE' "$log" 2> /dev/null; then
-        printf 'logged BUILD FAILURE despite exit 0'
+    #
+    # Only the LAST reactor result belongs to this invocation. Codiqo forks a build per analysed
+    # commit, and that fork writes its own summary into the same log — so a commit codiqo
+    # deliberately excluded (an unresolvable historical dependency, say) leaves a BUILD FAILURE
+    # behind even though the outer run went on to succeed and reported the exclusion. Matching
+    # anywhere in the file turned every such exclusion into a failed step, which is a normal
+    # backfill outcome, not a failure.
+    #
+    local result
+    result=$(grep -aoE 'BUILD (SUCCESS|FAILURE)' "$log" 2> /dev/null | tail -1)
+    if [ -z "$result" ]; then
+        printf 'did not log BUILD SUCCESS'
         return 1
     fi
-    if ! grep -q 'BUILD SUCCESS' "$log" 2> /dev/null; then
-        printf 'did not log BUILD SUCCESS'
+    if [ "$result" = 'BUILD FAILURE' ]; then
+        printf 'logged BUILD FAILURE despite exit 0'
         return 1
     fi
     return 0
