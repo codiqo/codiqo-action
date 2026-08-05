@@ -26,6 +26,7 @@ cmd+=("-Dcodiqo.missingAnalysesOutputFile=${CODIQO_MISSING_FILE}")
 
 if [ -n "${CODIQO_IN_API_URL:-}" ]; then cmd+=("-Dcodiqo.apiUrl=${CODIQO_IN_API_URL}"); fi
 if [ -n "${CODIQO_BRANCH:-}" ]; then cmd+=("-Dcodiqo.branch=${CODIQO_BRANCH}"); fi
+if [ -n "${CODIQO_IN_INCLUDE_BRANCHES:-}" ]; then cmd+=("-Dcodiqo.includeBranches=${CODIQO_IN_INCLUDE_BRANCHES}"); fi
 if [ -n "${CODIQO_IN_EXCLUDE_AUTHOR_EMAILS:-}" ]; then cmd+=("-Dcodiqo.excludeAuthorEmails=${CODIQO_IN_EXCLUDE_AUTHOR_EMAILS}"); fi
 if [ -n "${CODIQO_IN_INCLUDE_AUTHOR_EMAILS:-}" ]; then cmd+=("-Dcodiqo.includeAuthorEmails=${CODIQO_IN_INCLUDE_AUTHOR_EMAILS}"); fi
 if [ -n "${CODIQO_IN_MAX_COMMITS:-}" ]; then cmd+=("-Dcodiqo.missingAnalysesLimit=${CODIQO_IN_MAX_COMMITS}"); fi

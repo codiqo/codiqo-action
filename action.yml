@@ -81,7 +81,7 @@ inputs:
 
   # ------------------------------------------------------------------------------------ timeouts
   per-commit-timeout:
-    description: 'Wall-clock limit for analysing one commit before it is killed. Accepts 30m, 1h, 90m, 2h, or a raw number of minutes. Keep it comfortably above build-timeout-minutes.'
+    description: 'Wall-clock limit for analysing one commit before it is killed, enforced from outside the JVM. This is the outer deadline the build and test budgets are fitted under, so raising or lowering it moves them with it.'
     required: false
     default: '1h'
   per-commit-timeout-minutes:
@@ -90,15 +90,15 @@ inputs:
     default: ''
     deprecationMessage: 'per-commit-timeout-minutes is deprecated; use per-commit-timeout.'
   build-timeout-minutes:
-    description: 'Limit for the forked build of a single commit (-Dcodiqo.buildTimeoutMinutes). Must stay below per-commit-timeout: the fork timeout has to fire first, or the outer deadline kills the analysis before codiqo can excuse the commit as a build failure and retry it against older snapshots. The default is three quarters of the default per-commit-timeout.'
+    description: 'Limit for the forked build of a single commit (-Dcodiqo.buildTimeoutMinutes). It has to fire before per-commit-timeout, or the outer deadline kills the analysis before codiqo can record the commit as a build failure. Left empty it is three quarters of per-commit-timeout; a value that would not fit is clamped back to that, with a warning.'
     required: false
     default: '45'
   test-timeout-minutes:
-    description: 'Limit for the test phase of the forked build (-Dcodiqo.testTimeoutMinutes).'
+    description: 'Limit for the test phase of the forked build (-Dcodiqo.testTimeoutMinutes). Clamped to three quarters of the build timeout, so a hung test phase is reaped while the build can still finish and report.'
     required: false
     default: '30'
   per-test-timeout:
-    description: 'Limit for a single JUnit 5 test method, so one hanging test cannot fail the whole build. Accepts off, 5m, 10m, 15m, or raw minutes; the plugin caps it at 15 minutes. JUnit 4 and TestNG are unaffected.'
+    description: 'Limit for a single JUnit 5 test method, so one hanging test cannot fail the whole build. Accepts off, 5m, 10m, 15m, or raw minutes; capped at 15 minutes and at half the test-phase budget. JUnit 4 and TestNG are unaffected.'
     required: false
     default: '15m'
   import-timeout-minutes:
@@ -174,11 +174,11 @@ inputs:
     required: false
     default: 'true'
   include-branches:
-    description: 'Comma-separated regex patterns; only commits on a matching branch are analysed. Complements exclude-author-emails / include-author-emails.'
+    description: 'Comma-separated regex patterns; only commits on a matching branch are indexed and analysed. Applied while walking history, so a non-matching commit costs no build. Complements exclude-author-emails / include-author-emails.'
     required: false
     default: ''
   skip-on-build-failure:
-    description: 'Exclude a commit whose build fails instead of failing the run. Turn off only when a build failure should surface as a hard error.'
+    description: 'Exclude a commit whose build fails instead of failing the run. Turn off only when a build failure should surface as a hard error — a failing or timed-out build then fails the step rather than being recorded as an exclusion.'
     required: false
     default: 'true'
   fail-on-uninstrumented-module:
@@ -194,23 +194,19 @@ inputs:
     required: false
     default: 'false'
   ignore-cpd:
-    description: 'Skip copy-paste detection.'
+    description: 'Skip copy-paste detection. Duplication then scores neutral rather than clean — no copy-paste-free bonus is awarded, since nothing was measured.'
     required: false
     default: 'false'
   ignore-diagnostics:
-    description: 'Skip PMD and SpotBugs collection.'
+    description: 'Skip PMD and SpotBugs collection. Static analysis then scores neutral rather than clean — no clean-code bonus is awarded, since nothing was measured.'
     required: false
     default: 'false'
-  include-untracked:
-    description: 'Include files not tracked by git when resolving the change set.'
-    required: false
-    default: 'true'
   pmd-rules:
-    description: 'Comma-separated PMD ruleset resources, replacing the default set (bestpractices, codestyle, design, errorprone, performance, multithreading, security).'
+    description: 'Comma-separated PMD ruleset resources. REPLACES the default set rather than adding to it, so list every ruleset you still want. Note the default codestyle entry is codiqo''s own codiqo/pmd/java-codestyle.xml, not category/java/codestyle.xml: it re-registers MethodNamingConventions so underscore-named test methods are not reported as violations. Swapping in the stock ruleset makes every such test an ERROR-severity finding, which costs quality score.'
     required: false
     default: ''
   pmd-min-priority:
-    description: 'Lowest PMD rule priority to collect (high, medium-high, medium, medium-low, low).'
+    description: 'Lowest PMD rule priority to collect: high, medium_high, medium, medium_low, low (hyphens and spaces are accepted too).'
     required: false
     default: ''
   spotbugs-priority-threshold:
@@ -246,11 +242,11 @@ inputs:
     required: false
     default: ''
   driver-score-cap-multiplier:
-    description: 'Ceiling on a single block driver score, as a multiple of the project median.'
+    description: 'Ceiling on a commit''s TOTAL raw effort, as a multiple of its summed baseline. Individual block scores are never clipped, so lowering this deflates ordinary large commits rather than trimming one outlier block.'
     required: false
     default: ''
   driver-factor-max-deviation:
-    description: 'Ratio deviation above which a block is reported as a statement or invocation outlier.'
+    description: 'Deviation from the bucket median ratio above which a block is reported as a statement or invocation outlier. This is the per-block measure; driver-score-cap-multiplier bounds the commit total.'
     required: false
     default: ''
   driver-score-cap-dry-run:
@@ -366,6 +362,7 @@ runs:
         CODIQO_IN_PER_COMMIT_TIMEOUT_MINUTES: ${{ inputs.per-commit-timeout-minutes }}
         CODIQO_IN_PER_TEST_TIMEOUT: ${{ inputs.per-test-timeout }}
         CODIQO_IN_BUILD_TIMEOUT_MINUTES: ${{ inputs.build-timeout-minutes }}
+        CODIQO_IN_TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
         CODIQO_IN_MAVEN_COMMAND: ${{ inputs.maven-command }}
         CODIQO_IN_MAVEN_ARGS: ${{ inputs.maven-args }}
         CODIQO_IN_MAVEN_USER_PROPERTIES: ${{ inputs.maven-user-properties }}
@@ -422,6 +419,7 @@ runs:
         CODIQO_API_KEY: ${{ inputs.api-key }}
         CODIQO_IN_VERSION: ${{ inputs.codiqo-version }}
         CODIQO_IN_API_URL: ${{ inputs.api-url }}
+        CODIQO_IN_INCLUDE_BRANCHES: ${{ inputs.include-branches }}
         CODIQO_IN_EXCLUDE_AUTHOR_EMAILS: ${{ inputs.exclude-author-emails }}
         CODIQO_IN_INCLUDE_AUTHOR_EMAILS: ${{ inputs.include-author-emails }}
         CODIQO_IN_FIRST_PARENT_ONLY: ${{ inputs.first-parent-only }}
@@ -466,7 +464,6 @@ runs:
         CODIQO_IN_IGNORE_COMPLEXITY: ${{ inputs.ignore-complexity }}
         CODIQO_IN_IGNORE_CPD: ${{ inputs.ignore-cpd }}
         CODIQO_IN_IGNORE_DIAGNOSTICS: ${{ inputs.ignore-diagnostics }}
-        CODIQO_IN_INCLUDE_UNTRACKED: ${{ inputs.include-untracked }}
         CODIQO_IN_PMD_RULES: ${{ inputs.pmd-rules }}
         CODIQO_IN_PMD_MIN_PRIORITY: ${{ inputs.pmd-min-priority }}
         CODIQO_IN_SPOTBUGS_PRIORITY_THRESHOLD: ${{ inputs.spotbugs-priority-threshold }}
@@ -494,8 +491,6 @@ runs:
         CODIQO_IN_MAVEN_HOME: ${{ inputs.maven-home }}
         CODIQO_IN_MAVEN_PARALLELISM: ${{ inputs.maven-parallelism }}
         CODIQO_IN_JDTLS_VERSION: ${{ inputs.jdtls-version }}
-        CODIQO_IN_BUILD_TIMEOUT_MINUTES: ${{ inputs.build-timeout-minutes }}
-        CODIQO_IN_TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
         CODIQO_IN_IMPORT_TIMEOUT_MINUTES: ${{ inputs.import-timeout-minutes }}
         CODIQO_IN_API_CONNECT_TIMEOUT: ${{ inputs.api-connect-timeout-seconds }}
         CODIQO_IN_API_READ_TIMEOUT: ${{ inputs.api-read-timeout-seconds }}

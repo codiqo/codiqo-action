@@ -97,16 +97,59 @@ case "${CODIQO_IN_PER_TEST_TIMEOUT:-15m}" in
 esac
 
 #
-# The two deadlines are not interchangeable and their order is load-bearing. The outer per-commit
-# timeout kills the whole analysis; the inner build timeout only ends the forked build, which is what
-# lets codiqo excuse the commit as a build failure and retry it against progressively older snapshots.
-# The outer clock starts before the fork does, so an equal pair means the outer one always wins and
-# that recovery path becomes unreachable — every slow build turns into a hard CI failure instead.
+# The three deadlines nest, and the nesting is load-bearing rather than cosmetic. The outer per-commit
+# timeout kills the whole analysis. The build timeout ends one forked build, which is what lets codiqo
+# record the commit as a build failure instead of dying with it. The test timeout ends the test phase,
+# leaving the build free to finish and report. Each must be able to fire before the one outside it —
+# and the outer clock starts first, so an equal pair means the outer one always wins and the graceful
+# path is unreachable. Rather than reject the combination, derive each budget from the one around it
+# and clamp anything that does not fit: a caller who lowers per-commit-timeout wants a shorter run,
+# not a failed one, and every value below is passed explicitly so nothing falls back to a compiled
+# default that could reinstate the equality.
 #
-codiqo::_require_minutes "${CODIQO_IN_BUILD_TIMEOUT_MINUTES:-45}" "build-timeout-minutes"
-build_timeout_minutes="$CODIQO_MINUTES"
-if [ "$per_commit_minutes" -le "$build_timeout_minutes" ]; then
-    codiqo::die "per-commit-timeout (${per_commit_minutes}m) must be greater than build-timeout-minutes (${build_timeout_minutes}m), with enough headroom for the fork timeout to fire and the commit to be recorded as a build failure."
+codiqo::_fit_within() {
+    local fitted
+    fitted=$(( $1 * 3 / 4 ))
+    if [ "$fitted" -lt 1 ]; then
+        fitted=1
+    fi
+    CODIQO_MINUTES="$fitted"
+}
+
+codiqo::_fit_within "$per_commit_minutes"
+build_ceiling="$CODIQO_MINUTES"
+build_timeout_minutes="$build_ceiling"
+if [ -n "${CODIQO_IN_BUILD_TIMEOUT_MINUTES:-}" ]; then
+    codiqo::_require_minutes "${CODIQO_IN_BUILD_TIMEOUT_MINUTES}" "build-timeout-minutes"
+    build_timeout_minutes="$CODIQO_MINUTES"
+    if [ "$build_timeout_minutes" -gt "$build_ceiling" ]; then
+        codiqo::warn "build-timeout-minutes ${build_timeout_minutes}m leaves no room under the ${per_commit_minutes}m per-commit deadline; using ${build_ceiling}m so a fork timeout can still be reported as a build failure."
+        build_timeout_minutes="$build_ceiling"
+    fi
+fi
+
+codiqo::_fit_within "$build_timeout_minutes"
+test_ceiling="$CODIQO_MINUTES"
+test_timeout_minutes="${CODIQO_IN_TEST_TIMEOUT_MINUTES:-30}"
+codiqo::_require_minutes "$test_timeout_minutes" "test-timeout-minutes"
+test_timeout_minutes="$CODIQO_MINUTES"
+if [ "$test_timeout_minutes" -gt "$test_ceiling" ]; then
+    codiqo::warn "test-timeout-minutes ${test_timeout_minutes}m cannot fire inside a ${build_timeout_minutes}m build; using ${test_ceiling}m so a hung test phase is reaped instead of taking the whole build down."
+    test_timeout_minutes="$test_ceiling"
+fi
+
+#
+# The last rung: half the test budget, which is what the plugin derives for itself when the property
+# is absent. The action always passes it, so that derivation never runs here and the ceiling has to be
+# applied on this side. `off` stays off.
+#
+per_test_ceiling=$(( test_timeout_minutes / 2 ))
+if [ "$per_test_ceiling" -lt 1 ]; then
+    per_test_ceiling=1
+fi
+if [ "$per_test_minutes" -gt "$per_test_ceiling" ]; then
+    codiqo::warn "per-test-timeout ${per_test_minutes}m leaves no room inside a ${test_timeout_minutes}m test phase; using ${per_test_ceiling}m."
+    per_test_minutes="$per_test_ceiling"
 fi
 
 # ----------------------------------------------------------------------------------- branch
@@ -210,6 +253,8 @@ codiqo::export CODIQO_LOGS_DIR "$CODIQO_LOGS_DIR"
 codiqo::export CODIQO_COMMIT_WINDOW "$commit_window"
 codiqo::export CODIQO_PER_COMMIT_TIMEOUT_MINUTES "$per_commit_minutes"
 codiqo::export CODIQO_PER_COMMIT_TIMEOUT_SECONDS "$((per_commit_minutes * 60))"
+codiqo::export CODIQO_BUILD_TIMEOUT_MINUTES "$build_timeout_minutes"
+codiqo::export CODIQO_TEST_TIMEOUT_MINUTES "$test_timeout_minutes"
 codiqo::export CODIQO_PER_TEST_TIMEOUT_MINUTES "$per_test_minutes"
 codiqo::export CODIQO_BRANCH "$branch"
 codiqo::export CODIQO_MVN "$maven_command"
@@ -229,6 +274,7 @@ codiqo::log "branch           : ${branch:-<auto-detect>}"
 codiqo::log "commit window    : $commit_window"
 codiqo::log "per-commit limit : ${per_commit_minutes}m"
 codiqo::log "build limit      : ${build_timeout_minutes}m"
+codiqo::log "test limit       : ${test_timeout_minutes}m"
 codiqo::log "per-test limit   : ${per_test_minutes}m (0 = disabled)"
 codiqo::log "extra args       : $(wc -l < "$args_file" | tr -d ' ') line(s)"
 codiqo::log "user properties  : $(wc -l < "$props_file" | tr -d ' ') line(s)"

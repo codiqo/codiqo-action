@@ -76,11 +76,12 @@ for commit in "${commits[@]}"; do
     cmd+=("-Dcodiqo.ignoreComplexity=${CODIQO_IN_IGNORE_COMPLEXITY:-false}")
     cmd+=("-Dcodiqo.ignoreCpd=${CODIQO_IN_IGNORE_CPD:-false}")
     cmd+=("-Dcodiqo.ignoreDiagnostics=${CODIQO_IN_IGNORE_DIAGNOSTICS:-false}")
-    cmd+=("-Dcodiqo.include.untracked=${CODIQO_IN_INCLUDE_UNTRACKED:-true}")
     cmd+=("-Dcodiqo.moveDetectionEnabled=${CODIQO_IN_MOVE_DETECTION:-true}")
     cmd+=("-Dcodiqo.driverScoreCapDryRun=${CODIQO_IN_DRIVER_SCORE_CAP_DRY_RUN:-false}")
     cmd+=("-Dcodiqo.jdtUseSharedIndex=${CODIQO_IN_JDT_USE_SHARED_INDEX:-true}")
     cmd+=("-Dcodiqo.jdtIncludeDecompiledSources=${CODIQO_IN_JDT_INCLUDE_DECOMPILED_SOURCES:-false}")
+    cmd+=("-Dcodiqo.buildTimeoutMinutes=${CODIQO_BUILD_TIMEOUT_MINUTES}")
+    cmd+=("-Dcodiqo.testTimeoutMinutes=${CODIQO_TEST_TIMEOUT_MINUTES}")
     cmd+=("-Dcodiqo.perTestTimeoutMinutes=${CODIQO_PER_TEST_TIMEOUT_MINUTES}")
 
     if [ -n "${CODIQO_IN_API_URL:-}" ]; then cmd+=("-Dcodiqo.apiUrl=${CODIQO_IN_API_URL}"); fi
@@ -89,8 +90,6 @@ for commit in "${commits[@]}"; do
     if [ -n "${CODIQO_IN_JAVA_HOME:-}" ]; then cmd+=("-Dcodiqo.javaHome=${CODIQO_IN_JAVA_HOME}"); fi
     if [ -n "${CODIQO_IN_MAVEN_HOME:-}" ]; then cmd+=("-Dcodiqo.mavenHome=${CODIQO_IN_MAVEN_HOME}"); fi
     if [ -n "${CODIQO_IN_JDTLS_VERSION:-}" ]; then cmd+=("-Dcodiqo.jdtlsVersion=${CODIQO_IN_JDTLS_VERSION}"); fi
-    if [ -n "${CODIQO_IN_BUILD_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Dcodiqo.buildTimeoutMinutes=${CODIQO_IN_BUILD_TIMEOUT_MINUTES}"); fi
-    if [ -n "${CODIQO_IN_TEST_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Dcodiqo.testTimeoutMinutes=${CODIQO_IN_TEST_TIMEOUT_MINUTES}"); fi
     if [ -n "${CODIQO_IN_IMPORT_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Dcodiqo.importTimeoutMinutes=${CODIQO_IN_IMPORT_TIMEOUT_MINUTES}"); fi
     if [ -n "${CODIQO_IN_API_CONNECT_TIMEOUT:-}" ]; then cmd+=("-Dcodiqo.connectTimeoutSeconds=${CODIQO_IN_API_CONNECT_TIMEOUT}"); fi
     if [ -n "${CODIQO_IN_API_READ_TIMEOUT:-}" ]; then cmd+=("-Dcodiqo.readTimeoutSeconds=${CODIQO_IN_API_READ_TIMEOUT}"); fi

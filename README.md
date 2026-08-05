@@ -84,6 +84,7 @@ The action is incremental: commits already scored are skipped, so a schedule sim
 | `commit-window` | `3m` | `0`, `1m`, `3m`, `6m`, `1year`, or a raw ISO-8601 period such as `P2W`. |
 | `exclude-author-emails` | `''` | Comma-separated; a trailing `*` is allowed, e.g. `bot@*`. |
 | `include-author-emails` | `''` | Restrict analysis to these authors. |
+| `include-branches` | `''` | Comma-separated regex patterns; only commits on a matching branch are indexed and analysed. Applied while walking history, so a non-matching commit costs no build. |
 | `first-parent-only` | `true` | Measure a merge as what it brought to the target branch. |
 | `max-commits-per-run` | `1024` | Upper bound per run. Lower it for a first adoption. |
 | `index-batch-size` | `200` | Commits per index request. |
@@ -92,15 +93,22 @@ The action is incremental: commits already scored are skipped, so a schedule sim
 
 | Input | Default | Description |
 | --- | --- | --- |
-| `per-commit-timeout` | `1h` | `30m`, `1h`, `90m`, `2h`, or raw minutes. Keep above `build-timeout-minutes`. |
-| `build-timeout-minutes` | `60` | Forked build of one commit. |
-| `test-timeout-minutes` | `30` | Test phase of the forked build. |
-| `per-test-timeout` | `15m` | One JUnit 5 test method; `off` disables. Capped at 15 minutes. |
+| `per-commit-timeout` | `1h` | `30m`, `1h`, `90m`, `2h`, or raw minutes. The outer deadline everything else is fitted under. |
+| `build-timeout-minutes` | `45` | Forked build of one commit. Three quarters of `per-commit-timeout`; a larger value is clamped back to that with a warning. |
+| `test-timeout-minutes` | `30` | Test phase of the forked build. Clamped to three quarters of the build timeout. |
+| `per-test-timeout` | `15m` | One JUnit 5 test method; `off` disables. Capped at 15 minutes and at half the test-phase budget. |
 | `import-timeout-minutes` | `15` | Language server project import. Raise for a large reactor. |
 | `api-connect-timeout-seconds` | `30` | |
 | `api-read-timeout-seconds` | `60` | |
 
 `per-commit-timeout-minutes` is deprecated; `per-commit-timeout` accepts plain minutes.
+
+The three limits nest, and the order matters. `per-commit-timeout` is enforced from outside the JVM and kills
+the whole analysis; `build-timeout-minutes` ends one forked build, which is what lets codiqo record the commit
+as a build failure instead of dying with it; `test-timeout-minutes` ends the test phase, leaving the build free
+to finish and report. Each therefore has to be able to fire before the one around it. Rather than reject a
+combination that cannot, the action derives each budget from the one outside it and clamps anything that does
+not fit — so lowering `per-commit-timeout` shortens the run instead of failing it.
 
 ### Maven wiring
 
@@ -127,6 +135,49 @@ The action is incremental: commits already scored are skipped, so a schedule sim
 | `dump-analysis` | `true` | Keep the analysis document for debugging. |
 | `stop-on-first-failure` | `true` | Stop at the first commit that genuinely fails to analyse (timeout, OOM, failed analysis run). Commits codiqo excludes do not count. |
 | `require-full-history` | `true` | Refuse to run on a shallow or filtered clone. |
+| `skip-on-build-failure` | `true` | Record a commit whose build fails as an exclusion. Turn off and a failed or timed-out build fails the step instead. |
+| `fail-on-uninstrumented-module` | `true` | Fail when a module with tests produced no coverage data, which usually means the coverage agent never attached. |
+| `fail-on-jdtls-error` | `false` | Fail when the language server reports an error during import. Off by default: an import warning usually degrades blast-radius data rather than invalidating the analysis. |
+| `move-detection` | `true` | Charge relocated code a small relocation cost instead of full per-line effort. |
+| `agent-instructions` | `true` | Attach the repository's agent instruction files (`AGENTS.md`, `CLAUDE.md`, and equivalents) to the scoring prompt as a triage hint. They cannot change any score. |
+| `agent-instruction-files` | `''` | Comma-separated extra instruction paths, relative to the repository root. A path may name a file or a directory of rule files. |
+| `agent-instructions-max-chars` | `''` | Ceiling on the assembled instruction text. Exceeding it fails the analysis rather than truncating. Empty uses the engine default (64 KiB). |
+
+### Analysis depth
+
+Every input here is optional and empty by default, meaning "use the engine's own default". They exist to trade
+analysis cost against detail; none of them changes how effort is scored except where noted.
+
+| Input | Default | Description |
+| --- | --- | --- |
+| `ignore-complexity` | `false` | Skip complexity metric collection. |
+| `ignore-cpd` | `false` | Skip copy-paste detection. Duplication then scores neutral rather than clean — no copy-paste-free bonus, since nothing was measured. |
+| `ignore-diagnostics` | `false` | Skip PMD and SpotBugs collection. Static analysis then scores neutral rather than clean, on the same reasoning. |
+| `pmd-rules` | `''` | Comma-separated PMD ruleset resources. **Replaces** the default set rather than adding to it. The default codestyle entry is codiqo's own `codiqo/pmd/java-codestyle.xml`, which allows underscore-named test methods; substituting `category/java/codestyle.xml` makes every such test an ERROR-severity finding and costs quality score. |
+| `pmd-min-priority` | `''` | Lowest PMD rule priority to collect: `high`, `medium_high`, `medium`, `medium_low`, `low`. Hyphens and spaces are accepted. |
+| `spotbugs-priority-threshold` | `''` | Lowest SpotBugs priority to collect, as an integer (`1` = high). |
+| `spotbugs-omit-visitors` | `''` | Comma-separated SpotBugs detectors to skip, for detectors that are slow or noisy on your codebase. |
+| `cpd-minimum-tile-size` | `''` | Minimum token count for a copy-paste clone to be reported. |
+| `diff-context-lines` | `''` | Context lines included around each hunk in the diffs sent for scoring. |
+| `build-error-capture-limit` | `''` | Maximum characters of build output captured into a build-failure report. |
+| `jdt-use-shared-index` | `true` | Reuse the shared language-server index across runs. Much faster; turn off to force a clean index. |
+| `jdt-include-decompiled-sources` | `false` | Let the language server decompile dependency classes without sources. Slower, and rarely changes blast radius. |
+| `lsp-query-timeout-seconds` | `''` | Timeout for a single language-server query, such as a call-hierarchy lookup. |
+| `max-requests` | `''` | Maximum concurrent HTTP requests the engine issues. |
+| `max-requests-per-host` | `''` | Maximum concurrent HTTP requests per host. |
+
+### Scoring parameters
+
+Changing these changes how effort is scored, so a project's history stops being comparable across the change.
+Leave them empty unless you are deliberately recalibrating.
+
+| Input | Default | Description |
+| --- | --- | --- |
+| `move-similarity-threshold` | `''` | Multiset containment threshold (0-1) above which a deleted and an added line count as the same relocated line. |
+| `moved-line-coefficient` | `''` | Fraction of normal per-line effort charged to a confirmed relocated line. |
+| `driver-score-cap-multiplier` | `''` | Ceiling on a commit's total raw effort, as a multiple of its summed baseline. Individual block scores are never clipped. |
+| `driver-factor-max-deviation` | `''` | Deviation from the bucket median ratio above which a block is reported as a statement or invocation outlier. |
+| `driver-score-cap-dry-run` | `false` | Report where the driver-score cap would apply without applying it. |
 
 ### Observability
 
@@ -250,7 +301,7 @@ you want it.
 | `repository has incomplete history` | Add `fetch-depth: 0` to `actions/checkout`. |
 | `0 commits require analysis`, unexpectedly | Widen `commit-window`, check `exclude-author-emails`, confirm full history. |
 | **Plugin or `codiqo-maven-time-machine` will not resolve** | The version is not in your repositories. Check `codiqo-version`; note that a catch-all `<mirrorOf>` swallows the snapshot repository — exclude it with `<mirrorOf>external:*,!central-snapshots</mirrorOf>`. |
-| **Commit killed at the deadline** | Raise `per-commit-timeout` and `build-timeout-minutes`. Exit 137 can also be a kernel OOM kill: lower `maven-parallelism` or use a larger runner. |
+| **Commit killed at the deadline** | Raise `per-commit-timeout`; `build-timeout-minutes` follows it automatically. Raising only the build timeout is clamped back, since it must stay inside the outer deadline. Exit 137 can also be a kernel OOM kill: lower `maven-parallelism` or use a larger runner. |
 | **Artifact name conflict** | Give each job a distinct `log-artifact-name`. |
 
 ## Versioning

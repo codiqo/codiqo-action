@@ -164,6 +164,44 @@ jobs:
           reject 3m  1h  -5
           echo "ok: shorthand mappings and rejections behave"
 
+      # The nesting per-commit > build > test is what makes a fork timeout reportable instead of
+      # fatal, so it is derived and clamped rather than merely documented.
+      - name: timeout nesting is derived and clamped
+        run: |
+          set -euo pipefail
+          export GITHUB_ACTION_PATH="$PWD" RUNNER_TEMP="$(mktemp -d)"
+          fit() {
+            CODIQO_IN_VERSION=1.0-SNAPSHOT CODIQO_IN_COMMIT_WINDOW=3m \
+            CODIQO_IN_PER_COMMIT_TIMEOUT="$1" CODIQO_IN_PER_TEST_TIMEOUT=15m \
+            CODIQO_IN_BUILD_TIMEOUT_MINUTES="$2" CODIQO_IN_TEST_TIMEOUT_MINUTES="$3" \
+              ./scripts/resolve-config.sh 2>&1 || true
+          }
+          assert() {
+            local out
+            out="$(fit "$1" "$2" "$3")"
+            case "$out" in
+              *"$4"*) ;;
+              *) echo "FAIL: commit=$1 build=$2 test=$3 did not yield '$4'"; echo "$out"; exit 1 ;;
+            esac
+          }
+          # left empty, each budget is three quarters of the one around it
+          assert 1h  '' '' 'build limit      : 45m'
+          assert 1h  '' '' 'test limit       : 30m'
+          assert 30m '' '' 'build limit      : 22m'
+          # a build timeout that cannot fire inside the deadline is clamped, not rejected: the
+          # documented per-commit-timeout: 30m shorthand must keep working
+          assert 30m 60 '' 'build limit      : 22m'
+          assert 30m 60 '' '::warning::'
+          # and a test timeout that cannot fire inside the build is clamped the same way
+          assert 1h  45 90 'test limit       : 33m'
+          # values that already fit are passed through untouched
+          assert 90m 50 20 'build limit      : 50m'
+          assert 90m 50 20 'test limit       : 20m'
+          # the per-test budget is the last rung, and `off` stays off at every size
+          assert 30m '' '' 'per-test limit   : 8m'
+          assert 1h  '' '' 'per-test limit   : 15m'
+          echo "ok: timeout budgets nest"
+
       - name: settings.xml merge is idempotent and preserves the caller's profiles
         run: |
           set -euo pipefail
