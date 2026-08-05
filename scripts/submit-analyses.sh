@@ -69,6 +69,18 @@ for commit in "${commits[@]}"; do
     cmd+=("-Dcodiqo.ignoreCoverage=${CODIQO_IN_IGNORE_COVERAGE:-false}")
     cmd+=("-Dcodiqo.timeMachineEnabled=${CODIQO_IN_TIME_MACHINE:-true}")
     cmd+=("-Dcodiqo.dumpAnalysis=${CODIQO_IN_DUMP_ANALYSIS:-true}")
+    cmd+=("-Dcodiqo.llm.autoDiscoveryAgentInstructions=${CODIQO_IN_AGENT_INSTRUCTIONS:-true}")
+    cmd+=("-Dcodiqo.skipOnBuildFailure=${CODIQO_IN_SKIP_ON_BUILD_FAILURE:-true}")
+    cmd+=("-Dcodiqo.failOnUninstrumentedModule=${CODIQO_IN_FAIL_ON_UNINSTRUMENTED_MODULE:-true}")
+    cmd+=("-Dcodiqo.failOnJdtlsError=${CODIQO_IN_FAIL_ON_JDTLS_ERROR:-false}")
+    cmd+=("-Dcodiqo.ignoreComplexity=${CODIQO_IN_IGNORE_COMPLEXITY:-false}")
+    cmd+=("-Dcodiqo.ignoreCpd=${CODIQO_IN_IGNORE_CPD:-false}")
+    cmd+=("-Dcodiqo.ignoreDiagnostics=${CODIQO_IN_IGNORE_DIAGNOSTICS:-false}")
+    cmd+=("-Dcodiqo.include.untracked=${CODIQO_IN_INCLUDE_UNTRACKED:-true}")
+    cmd+=("-Dcodiqo.moveDetectionEnabled=${CODIQO_IN_MOVE_DETECTION:-true}")
+    cmd+=("-Dcodiqo.driverScoreCapDryRun=${CODIQO_IN_DRIVER_SCORE_CAP_DRY_RUN:-false}")
+    cmd+=("-Dcodiqo.jdtUseSharedIndex=${CODIQO_IN_JDT_USE_SHARED_INDEX:-true}")
+    cmd+=("-Dcodiqo.jdtIncludeDecompiledSources=${CODIQO_IN_JDT_INCLUDE_DECOMPILED_SOURCES:-false}")
     cmd+=("-Dcodiqo.perTestTimeoutMinutes=${CODIQO_PER_TEST_TIMEOUT_MINUTES}")
 
     if [ -n "${CODIQO_IN_API_URL:-}" ]; then cmd+=("-Dcodiqo.apiUrl=${CODIQO_IN_API_URL}"); fi
@@ -82,6 +94,23 @@ for commit in "${commits[@]}"; do
     if [ -n "${CODIQO_IN_IMPORT_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Dcodiqo.importTimeoutMinutes=${CODIQO_IN_IMPORT_TIMEOUT_MINUTES}"); fi
     if [ -n "${CODIQO_IN_API_CONNECT_TIMEOUT:-}" ]; then cmd+=("-Dcodiqo.connectTimeoutSeconds=${CODIQO_IN_API_CONNECT_TIMEOUT}"); fi
     if [ -n "${CODIQO_IN_API_READ_TIMEOUT:-}" ]; then cmd+=("-Dcodiqo.readTimeoutSeconds=${CODIQO_IN_API_READ_TIMEOUT}"); fi
+    if [ -n "${CODIQO_IN_INCLUDE_BRANCHES:-}" ]; then cmd+=("-Dcodiqo.includeBranches=${CODIQO_IN_INCLUDE_BRANCHES}"); fi
+    if [ -n "${CODIQO_IN_PMD_RULES:-}" ]; then cmd+=("-Dcodiqo.pmdRules=${CODIQO_IN_PMD_RULES}"); fi
+    if [ -n "${CODIQO_IN_PMD_MIN_PRIORITY:-}" ]; then cmd+=("-Dcodiqo.pmdMinPriority=${CODIQO_IN_PMD_MIN_PRIORITY}"); fi
+    if [ -n "${CODIQO_IN_SPOTBUGS_PRIORITY_THRESHOLD:-}" ]; then cmd+=("-Dcodiqo.spotbugsPriorityThreshold=${CODIQO_IN_SPOTBUGS_PRIORITY_THRESHOLD}"); fi
+    if [ -n "${CODIQO_IN_SPOTBUGS_OMIT_VISITORS:-}" ]; then cmd+=("-Dcodiqo.spotbugsOmitVisitors=${CODIQO_IN_SPOTBUGS_OMIT_VISITORS}"); fi
+    if [ -n "${CODIQO_IN_CPD_MINIMUM_TILE_SIZE:-}" ]; then cmd+=("-Dcodiqo.cpdMinimumTileSize=${CODIQO_IN_CPD_MINIMUM_TILE_SIZE}"); fi
+    if [ -n "${CODIQO_IN_DIFF_CONTEXT_LINES:-}" ]; then cmd+=("-Dcodiqo.diffContextLines=${CODIQO_IN_DIFF_CONTEXT_LINES}"); fi
+    if [ -n "${CODIQO_IN_BUILD_ERROR_CAPTURE_LIMIT:-}" ]; then cmd+=("-Dcodiqo.buildErrorCaptureLimit=${CODIQO_IN_BUILD_ERROR_CAPTURE_LIMIT}"); fi
+    if [ -n "${CODIQO_IN_MOVE_SIMILARITY_THRESHOLD:-}" ]; then cmd+=("-Dcodiqo.moveSimilarityThreshold=${CODIQO_IN_MOVE_SIMILARITY_THRESHOLD}"); fi
+    if [ -n "${CODIQO_IN_MOVED_LINE_COEFFICIENT:-}" ]; then cmd+=("-Dcodiqo.movedLineCoefficient=${CODIQO_IN_MOVED_LINE_COEFFICIENT}"); fi
+    if [ -n "${CODIQO_IN_DRIVER_SCORE_CAP_MULTIPLIER:-}" ]; then cmd+=("-Dcodiqo.driverScoreCapMultiplier=${CODIQO_IN_DRIVER_SCORE_CAP_MULTIPLIER}"); fi
+    if [ -n "${CODIQO_IN_DRIVER_FACTOR_MAX_DEVIATION:-}" ]; then cmd+=("-Dcodiqo.driverFactorMaxDeviation=${CODIQO_IN_DRIVER_FACTOR_MAX_DEVIATION}"); fi
+    if [ -n "${CODIQO_IN_MAX_REQUESTS:-}" ]; then cmd+=("-Dcodiqo.maxRequests=${CODIQO_IN_MAX_REQUESTS}"); fi
+    if [ -n "${CODIQO_IN_MAX_REQUESTS_PER_HOST:-}" ]; then cmd+=("-Dcodiqo.maxRequestsPerHost=${CODIQO_IN_MAX_REQUESTS_PER_HOST}"); fi
+    if [ -n "${CODIQO_IN_LSP_QUERY_TIMEOUT_SECONDS:-}" ]; then cmd+=("-Dcodiqo.lspQueryTimeoutSeconds=${CODIQO_IN_LSP_QUERY_TIMEOUT_SECONDS}"); fi
+    if [ -n "${CODIQO_IN_AGENT_INSTRUCTION_FILES:-}" ]; then cmd+=("-Dcodiqo.llm.conventionFiles=${CODIQO_IN_AGENT_INSTRUCTION_FILES}"); fi
+    if [ -n "${CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS:-}" ]; then cmd+=("-Dcodiqo.llm.conventionFilesMaxChars=${CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS}"); fi
 
     rc=0
     log="$CODIQO_LOGS_DIR/submit-${commit}.log"

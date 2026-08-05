@@ -90,9 +90,9 @@ inputs:
     default: ''
     deprecationMessage: 'per-commit-timeout-minutes is deprecated; use per-commit-timeout.'
   build-timeout-minutes:
-    description: 'Limit for the forked build of a single commit (-Dcodiqo.buildTimeoutMinutes).'
+    description: 'Limit for the forked build of a single commit (-Dcodiqo.buildTimeoutMinutes). Must stay below per-commit-timeout: the fork timeout has to fire first, or the outer deadline kills the analysis before codiqo can excuse the commit as a build failure and retry it against older snapshots. The default is three quarters of the default per-commit-timeout.'
     required: false
-    default: '60'
+    default: '45'
   test-timeout-minutes:
     description: 'Limit for the test phase of the forked build (-Dcodiqo.testTimeoutMinutes).'
     required: false
@@ -173,6 +173,122 @@ inputs:
     description: 'Keep the analysis document alongside the submission for debugging.'
     required: false
     default: 'true'
+  include-branches:
+    description: 'Comma-separated regex patterns; only commits on a matching branch are analysed. Complements exclude-author-emails / include-author-emails.'
+    required: false
+    default: ''
+  skip-on-build-failure:
+    description: 'Exclude a commit whose build fails instead of failing the run. Turn off only when a build failure should surface as a hard error.'
+    required: false
+    default: 'true'
+  fail-on-uninstrumented-module:
+    description: 'Fail when a module produced no coverage data, which usually means the coverage agent was not attached. Turn off for reactors where some modules legitimately run no tests.'
+    required: false
+    default: 'true'
+  fail-on-jdtls-error:
+    description: 'Fail when the Java language server reports an error during import. Off by default: an import warning usually degrades blast-radius data rather than invalidating the analysis.'
+    required: false
+    default: 'false'
+  ignore-complexity:
+    description: 'Skip complexity metric collection.'
+    required: false
+    default: 'false'
+  ignore-cpd:
+    description: 'Skip copy-paste detection.'
+    required: false
+    default: 'false'
+  ignore-diagnostics:
+    description: 'Skip PMD and SpotBugs collection.'
+    required: false
+    default: 'false'
+  include-untracked:
+    description: 'Include files not tracked by git when resolving the change set.'
+    required: false
+    default: 'true'
+  pmd-rules:
+    description: 'Comma-separated PMD ruleset resources, replacing the default set (bestpractices, codestyle, design, errorprone, performance, multithreading, security).'
+    required: false
+    default: ''
+  pmd-min-priority:
+    description: 'Lowest PMD rule priority to collect (high, medium-high, medium, medium-low, low).'
+    required: false
+    default: ''
+  spotbugs-priority-threshold:
+    description: 'Lowest SpotBugs priority to collect, as an integer (1 = high).'
+    required: false
+    default: ''
+  spotbugs-omit-visitors:
+    description: 'Comma-separated SpotBugs detectors to skip, for detectors that are slow or noisy on your codebase.'
+    required: false
+    default: ''
+  cpd-minimum-tile-size:
+    description: 'Minimum token count for a copy-paste clone to be reported.'
+    required: false
+    default: ''
+  diff-context-lines:
+    description: 'Context lines included around each hunk in the diffs sent for scoring.'
+    required: false
+    default: ''
+  build-error-capture-limit:
+    description: 'Maximum characters of build output captured into a build-failure report.'
+    required: false
+    default: ''
+  move-detection:
+    description: 'Detect relocated code so a moved block is charged a small relocation cost instead of full per-line effort.'
+    required: false
+    default: 'true'
+  move-similarity-threshold:
+    description: 'Multiset containment threshold (0-1) above which a deleted and an added line count as the same relocated line.'
+    required: false
+    default: ''
+  moved-line-coefficient:
+    description: 'Fraction of normal per-line effort charged to a confirmed relocated line.'
+    required: false
+    default: ''
+  driver-score-cap-multiplier:
+    description: 'Ceiling on a single block driver score, as a multiple of the project median.'
+    required: false
+    default: ''
+  driver-factor-max-deviation:
+    description: 'Ratio deviation above which a block is reported as a statement or invocation outlier.'
+    required: false
+    default: ''
+  driver-score-cap-dry-run:
+    description: 'Report where the driver-score cap would apply without actually applying it.'
+    required: false
+    default: 'false'
+  jdt-use-shared-index:
+    description: 'Reuse the shared JDT index across runs. Much faster; turn off to force a clean index.'
+    required: false
+    default: 'true'
+  jdt-include-decompiled-sources:
+    description: 'Let the language server decompile dependency classes without sources. Slower, and rarely changes blast radius.'
+    required: false
+    default: 'false'
+  max-requests:
+    description: 'Maximum concurrent HTTP requests the engine issues.'
+    required: false
+    default: ''
+  max-requests-per-host:
+    description: 'Maximum concurrent HTTP requests per host.'
+    required: false
+    default: ''
+  lsp-query-timeout-seconds:
+    description: 'Timeout for a single language-server query, such as a call-hierarchy lookup.'
+    required: false
+    default: ''
+  agent-instructions:
+    description: 'Attach the repository''s agent instruction files (AGENTS.md, CLAUDE.md, .github/copilot-instructions.md, .cursorrules, .cursor/rules, and equivalents) to the scoring prompt. They are a hint for finding triage only: they stop the model reporting your documented idioms as defects and shape suggested fixes, and are barred from changing any score. Set to false to keep them out of the prompt entirely.'
+    required: false
+    default: 'true'
+  agent-instruction-files:
+    description: 'Comma-separated extra instruction paths, relative to the repository root, on top of (or instead of) the well-known locations. An entry may name a file or a directory of rule files.'
+    required: false
+    default: ''
+  agent-instructions-max-chars:
+    description: 'Ceiling on the assembled instruction text. Exceeding it fails the analysis rather than truncating, so the ceiling is raised deliberately: a trimmed rule set silently changes which findings the model suppresses. Leave empty for the engine default (64 KiB).'
+    required: false
+    default: ''
   stop-on-first-failure:
     description: 'Stop at the first commit that genuinely fails to analyse — a timeout, an out-of-memory kill, or a build failure of the analysis run itself. A commit codiqo excludes (unresolvable historical dependency, build failure of the analysed commit, no analyzable diff) is a normal outcome and never trips this. Turn it off to attempt every commit and fail the step at the end.'
     required: false
@@ -249,6 +365,7 @@ runs:
         CODIQO_IN_PER_COMMIT_TIMEOUT: ${{ inputs.per-commit-timeout }}
         CODIQO_IN_PER_COMMIT_TIMEOUT_MINUTES: ${{ inputs.per-commit-timeout-minutes }}
         CODIQO_IN_PER_TEST_TIMEOUT: ${{ inputs.per-test-timeout }}
+        CODIQO_IN_BUILD_TIMEOUT_MINUTES: ${{ inputs.build-timeout-minutes }}
         CODIQO_IN_MAVEN_COMMAND: ${{ inputs.maven-command }}
         CODIQO_IN_MAVEN_ARGS: ${{ inputs.maven-args }}
         CODIQO_IN_MAVEN_USER_PROPERTIES: ${{ inputs.maven-user-properties }}
@@ -342,6 +459,35 @@ runs:
         CODIQO_IN_IGNORE_COVERAGE: ${{ inputs.ignore-coverage }}
         CODIQO_IN_TIME_MACHINE: ${{ inputs.time-machine }}
         CODIQO_IN_DUMP_ANALYSIS: ${{ inputs.dump-analysis }}
+        CODIQO_IN_INCLUDE_BRANCHES: ${{ inputs.include-branches }}
+        CODIQO_IN_SKIP_ON_BUILD_FAILURE: ${{ inputs.skip-on-build-failure }}
+        CODIQO_IN_FAIL_ON_UNINSTRUMENTED_MODULE: ${{ inputs.fail-on-uninstrumented-module }}
+        CODIQO_IN_FAIL_ON_JDTLS_ERROR: ${{ inputs.fail-on-jdtls-error }}
+        CODIQO_IN_IGNORE_COMPLEXITY: ${{ inputs.ignore-complexity }}
+        CODIQO_IN_IGNORE_CPD: ${{ inputs.ignore-cpd }}
+        CODIQO_IN_IGNORE_DIAGNOSTICS: ${{ inputs.ignore-diagnostics }}
+        CODIQO_IN_INCLUDE_UNTRACKED: ${{ inputs.include-untracked }}
+        CODIQO_IN_PMD_RULES: ${{ inputs.pmd-rules }}
+        CODIQO_IN_PMD_MIN_PRIORITY: ${{ inputs.pmd-min-priority }}
+        CODIQO_IN_SPOTBUGS_PRIORITY_THRESHOLD: ${{ inputs.spotbugs-priority-threshold }}
+        CODIQO_IN_SPOTBUGS_OMIT_VISITORS: ${{ inputs.spotbugs-omit-visitors }}
+        CODIQO_IN_CPD_MINIMUM_TILE_SIZE: ${{ inputs.cpd-minimum-tile-size }}
+        CODIQO_IN_DIFF_CONTEXT_LINES: ${{ inputs.diff-context-lines }}
+        CODIQO_IN_BUILD_ERROR_CAPTURE_LIMIT: ${{ inputs.build-error-capture-limit }}
+        CODIQO_IN_MOVE_DETECTION: ${{ inputs.move-detection }}
+        CODIQO_IN_MOVE_SIMILARITY_THRESHOLD: ${{ inputs.move-similarity-threshold }}
+        CODIQO_IN_MOVED_LINE_COEFFICIENT: ${{ inputs.moved-line-coefficient }}
+        CODIQO_IN_DRIVER_SCORE_CAP_MULTIPLIER: ${{ inputs.driver-score-cap-multiplier }}
+        CODIQO_IN_DRIVER_FACTOR_MAX_DEVIATION: ${{ inputs.driver-factor-max-deviation }}
+        CODIQO_IN_DRIVER_SCORE_CAP_DRY_RUN: ${{ inputs.driver-score-cap-dry-run }}
+        CODIQO_IN_JDT_USE_SHARED_INDEX: ${{ inputs.jdt-use-shared-index }}
+        CODIQO_IN_JDT_INCLUDE_DECOMPILED_SOURCES: ${{ inputs.jdt-include-decompiled-sources }}
+        CODIQO_IN_MAX_REQUESTS: ${{ inputs.max-requests }}
+        CODIQO_IN_MAX_REQUESTS_PER_HOST: ${{ inputs.max-requests-per-host }}
+        CODIQO_IN_LSP_QUERY_TIMEOUT_SECONDS: ${{ inputs.lsp-query-timeout-seconds }}
+        CODIQO_IN_AGENT_INSTRUCTIONS: ${{ inputs.agent-instructions }}
+        CODIQO_IN_AGENT_INSTRUCTION_FILES: ${{ inputs.agent-instruction-files }}
+        CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS: ${{ inputs.agent-instructions-max-chars }}
         CODIQO_IN_STOP_ON_FIRST_FAILURE: ${{ inputs.stop-on-first-failure }}
         CODIQO_IN_LOG_COMMIT_AUTHORS: ${{ inputs.log-commit-authors }}
         CODIQO_IN_JAVA_HOME: ${{ inputs.java-home }}

@@ -96,6 +96,19 @@ case "${CODIQO_IN_PER_TEST_TIMEOUT:-15m}" in
         ;;
 esac
 
+#
+# The two deadlines are not interchangeable and their order is load-bearing. The outer per-commit
+# timeout kills the whole analysis; the inner build timeout only ends the forked build, which is what
+# lets codiqo excuse the commit as a build failure and retry it against progressively older snapshots.
+# The outer clock starts before the fork does, so an equal pair means the outer one always wins and
+# that recovery path becomes unreachable — every slow build turns into a hard CI failure instead.
+#
+codiqo::_require_minutes "${CODIQO_IN_BUILD_TIMEOUT_MINUTES:-45}" "build-timeout-minutes"
+build_timeout_minutes="$CODIQO_MINUTES"
+if [ "$per_commit_minutes" -le "$build_timeout_minutes" ]; then
+    codiqo::die "per-commit-timeout (${per_commit_minutes}m) must be greater than build-timeout-minutes (${build_timeout_minutes}m), with enough headroom for the fork timeout to fire and the commit to be recorded as a build failure."
+fi
+
 # ----------------------------------------------------------------------------------- branch
 
 #
@@ -215,6 +228,7 @@ codiqo::log "maven command    : $maven_command"
 codiqo::log "branch           : ${branch:-<auto-detect>}"
 codiqo::log "commit window    : $commit_window"
 codiqo::log "per-commit limit : ${per_commit_minutes}m"
+codiqo::log "build limit      : ${build_timeout_minutes}m"
 codiqo::log "per-test limit   : ${per_test_minutes}m (0 = disabled)"
 codiqo::log "extra args       : $(wc -l < "$args_file" | tr -d ' ') line(s)"
 codiqo::log "user properties  : $(wc -l < "$props_file" | tr -d ' ') line(s)"
