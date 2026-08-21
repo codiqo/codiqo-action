@@ -31,6 +31,7 @@ if [ -n "${CODIQO_IN_EXCLUDE_AUTHOR_EMAILS:-}" ]; then cmd+=("-Dcodiqo.excludeAu
 if [ -n "${CODIQO_IN_INCLUDE_AUTHOR_EMAILS:-}" ]; then cmd+=("-Dcodiqo.includeAuthorEmails=${CODIQO_IN_INCLUDE_AUTHOR_EMAILS}"); fi
 if [ -n "${CODIQO_IN_MAX_COMMITS:-}" ]; then cmd+=("-Dcodiqo.missingAnalysesLimit=${CODIQO_IN_MAX_COMMITS}"); fi
 if [ -n "${CODIQO_IN_INDEX_BATCH_SIZE:-}" ]; then cmd+=("-Dcodiqo.indexBatchSize=${CODIQO_IN_INDEX_BATCH_SIZE}"); fi
+if [ -n "${CODIQO_IN_INDEX_REF:-}" ]; then cmd+=("-Dcodiqo.indexRef=${CODIQO_IN_INDEX_REF}"); fi
 if [ -n "${CODIQO_IN_API_CONNECT_TIMEOUT:-}" ]; then cmd+=("-Dcodiqo.connectTimeoutSeconds=${CODIQO_IN_API_CONNECT_TIMEOUT}"); fi
 if [ -n "${CODIQO_IN_API_READ_TIMEOUT:-}" ]; then cmd+=("-Dcodiqo.readTimeoutSeconds=${CODIQO_IN_API_READ_TIMEOUT}"); fi
 

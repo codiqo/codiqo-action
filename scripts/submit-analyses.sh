@@ -80,6 +80,7 @@ for commit in "${commits[@]}"; do
     cmd+=("-Dcodiqo.driverScoreCapDryRun=${CODIQO_IN_DRIVER_SCORE_CAP_DRY_RUN:-false}")
     cmd+=("-Dcodiqo.jdtUseSharedIndex=${CODIQO_IN_JDT_USE_SHARED_INDEX:-true}")
     cmd+=("-Dcodiqo.jdtIncludeDecompiledSources=${CODIQO_IN_JDT_INCLUDE_DECOMPILED_SOURCES:-false}")
+    cmd+=("-Dcodiqo.jdtlsUseSnapshot=${CODIQO_IN_JDTLS_USE_SNAPSHOT:-false}")
     cmd+=("-Dcodiqo.buildTimeoutMinutes=${CODIQO_BUILD_TIMEOUT_MINUTES}")
     cmd+=("-Dcodiqo.testTimeoutMinutes=${CODIQO_TEST_TIMEOUT_MINUTES}")
     cmd+=("-Dcodiqo.perTestTimeoutMinutes=${CODIQO_PER_TEST_TIMEOUT_MINUTES}")
@@ -108,6 +109,8 @@ for commit in "${commits[@]}"; do
     if [ -n "${CODIQO_IN_MAX_REQUESTS:-}" ]; then cmd+=("-Dcodiqo.maxRequests=${CODIQO_IN_MAX_REQUESTS}"); fi
     if [ -n "${CODIQO_IN_MAX_REQUESTS_PER_HOST:-}" ]; then cmd+=("-Dcodiqo.maxRequestsPerHost=${CODIQO_IN_MAX_REQUESTS_PER_HOST}"); fi
     if [ -n "${CODIQO_IN_LSP_QUERY_TIMEOUT_SECONDS:-}" ]; then cmd+=("-Dcodiqo.lspQueryTimeoutSeconds=${CODIQO_IN_LSP_QUERY_TIMEOUT_SECONDS}"); fi
+    if [ -n "${CODIQO_IN_JDT_SOURCE_EXCLUSIONS:-}" ]; then cmd+=("-Dcodiqo.jdtSourceExclusions=${CODIQO_IN_JDT_SOURCE_EXCLUSIONS}"); fi
+    if [ -n "${CODIQO_IN_ANALYSIS_OUTPUT_DIRECTORY:-}" ]; then cmd+=("-Dcodiqo.outputDirectory=${CODIQO_IN_ANALYSIS_OUTPUT_DIRECTORY}"); fi
     if [ -n "${CODIQO_IN_AGENT_INSTRUCTION_FILES:-}" ]; then cmd+=("-Dcodiqo.llm.conventionFiles=${CODIQO_IN_AGENT_INSTRUCTION_FILES}"); fi
     if [ -n "${CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS:-}" ]; then cmd+=("-Dcodiqo.llm.conventionFilesMaxChars=${CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS}"); fi
 

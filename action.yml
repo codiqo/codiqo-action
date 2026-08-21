@@ -48,6 +48,10 @@ inputs:
     description: 'Eclipse JDT language server version (-Dcodiqo.jdtlsVersion). Leave empty to use the version the plugin ships with.'
     required: false
     default: ''
+  jdtls-use-snapshot:
+    description: 'Resolve the language server from Eclipse''s snapshot channel instead of a pinned milestone (-Dcodiqo.jdtlsUseSnapshot). jdtls-version is then ignored, and the shared index is re-keyed whenever upstream publishes a new build.'
+    required: false
+    default: 'false'
   cache:
     description: 'Dependency cache for actions/setup-java ("maven", "gradle", or empty to disable). Disable it when an earlier step purges the local repository, or the restore will undo the purge.'
     required: false
@@ -78,6 +82,10 @@ inputs:
     description: 'How many commits are sent to the API per index request.'
     required: false
     default: '200'
+  index-ref:
+    description: 'Git ref whose history is walked to find commits needing analysis (-Dcodiqo.indexRef). Empty uses HEAD, which is what a normal branch build wants; set it to index a ref other than the one checked out.'
+    required: false
+    default: ''
 
   # ------------------------------------------------------------------------------------ timeouts
   per-commit-timeout:
@@ -170,9 +178,13 @@ inputs:
     required: false
     default: 'true'
   dump-analysis:
-    description: 'Keep the analysis document alongside the submission for debugging.'
+    description: 'Write the submission document the API receives to disk. On its own it lands in a temporary file that dies with the runner; set analysis-output-directory to somewhere you collect if you actually want to read it.'
     required: false
     default: 'true'
+  analysis-output-directory:
+    description: 'Directory for the dumped submission document (-Dcodiqo.outputDirectory). Empty leaves it in a runner temporary file. Point it inside the log directory to have it uploaded with the log artifact — one document per commit, so mind the artifact size on a large backlog. Scoring is server-side on this path, so no HTML report is produced locally.'
+    required: false
+    default: ''
   include-branches:
     description: 'Comma-separated regex patterns; only commits on a matching branch are indexed and analysed. Applied while walking history, so a non-matching commit costs no build. Complements exclude-author-emails / include-author-emails.'
     required: false
@@ -261,6 +273,10 @@ inputs:
     description: 'Let the language server decompile dependency classes without sources. Slower, and rarely changes blast radius.'
     required: false
     default: 'false'
+  jdt-source-exclusions:
+    description: 'Comma-separated groupId prefixes whose -sources.jar is removed from the local repository before the language server imports the project (-Dcodiqo.jdtSourceExclusions). REPLACES the default list rather than adding to it. The default covers the Scala and Kotlin dependency families whose source jars hang or crash the import; extend it (repeating the defaults you still want) if a dependency of yours ships non-Java sources and the import stalls.'
+    required: false
+    default: ''
   max-requests:
     description: 'Maximum concurrent HTTP requests the engine issues.'
     required: false
@@ -384,7 +400,7 @@ runs:
     # from every run. Small and immutable, unlike the language server's own index.
     #
     - name: Cache the Codiqo language server download
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.cache/fetch
         key: codiqo-fetch-${{ runner.os }}-${{ inputs.codiqo-version }}-${{ inputs.jdtls-version }}
@@ -425,6 +441,7 @@ runs:
         CODIQO_IN_FIRST_PARENT_ONLY: ${{ inputs.first-parent-only }}
         CODIQO_IN_MAX_COMMITS: ${{ inputs.max-commits-per-run }}
         CODIQO_IN_INDEX_BATCH_SIZE: ${{ inputs.index-batch-size }}
+        CODIQO_IN_INDEX_REF: ${{ inputs.index-ref }}
         CODIQO_IN_API_CONNECT_TIMEOUT: ${{ inputs.api-connect-timeout-seconds }}
         CODIQO_IN_API_READ_TIMEOUT: ${{ inputs.api-read-timeout-seconds }}
 
@@ -479,6 +496,7 @@ runs:
         CODIQO_IN_DRIVER_SCORE_CAP_DRY_RUN: ${{ inputs.driver-score-cap-dry-run }}
         CODIQO_IN_JDT_USE_SHARED_INDEX: ${{ inputs.jdt-use-shared-index }}
         CODIQO_IN_JDT_INCLUDE_DECOMPILED_SOURCES: ${{ inputs.jdt-include-decompiled-sources }}
+        CODIQO_IN_JDT_SOURCE_EXCLUSIONS: ${{ inputs.jdt-source-exclusions }}
         CODIQO_IN_MAX_REQUESTS: ${{ inputs.max-requests }}
         CODIQO_IN_MAX_REQUESTS_PER_HOST: ${{ inputs.max-requests-per-host }}
         CODIQO_IN_LSP_QUERY_TIMEOUT_SECONDS: ${{ inputs.lsp-query-timeout-seconds }}
@@ -491,6 +509,8 @@ runs:
         CODIQO_IN_MAVEN_HOME: ${{ inputs.maven-home }}
         CODIQO_IN_MAVEN_PARALLELISM: ${{ inputs.maven-parallelism }}
         CODIQO_IN_JDTLS_VERSION: ${{ inputs.jdtls-version }}
+        CODIQO_IN_JDTLS_USE_SNAPSHOT: ${{ inputs.jdtls-use-snapshot }}
+        CODIQO_IN_ANALYSIS_OUTPUT_DIRECTORY: ${{ inputs.analysis-output-directory }}
         CODIQO_IN_IMPORT_TIMEOUT_MINUTES: ${{ inputs.import-timeout-minutes }}
         CODIQO_IN_API_CONNECT_TIMEOUT: ${{ inputs.api-connect-timeout-seconds }}
         CODIQO_IN_API_READ_TIMEOUT: ${{ inputs.api-read-timeout-seconds }}
@@ -516,7 +536,7 @@ runs:
 
     - name: Upload Codiqo logs
       if: always() && inputs.upload-logs == 'true'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: ${{ inputs.log-artifact-name }}
         path: ${{ runner.temp }}/step-logs/

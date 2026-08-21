@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0          # required, see Requirements
 
@@ -75,6 +75,7 @@ The action is incremental: commits already scored are skipped, so a schedule sim
 | `maven-command` | `auto` | `auto` prefers `./mvnw`, else `mvn`. This action does not install Maven. |
 | `maven-home` | `''` | Maven home for the forked build. |
 | `jdtls-version` | `''` | Language server version override. |
+| `jdtls-use-snapshot` | `false` | Resolve the language server from Eclipse's snapshot channel; `jdtls-version` is then ignored. |
 | `cache` | `maven` | `actions/setup-java` cache. Set `''` to disable. |
 
 ### Scope and filters
@@ -88,6 +89,7 @@ The action is incremental: commits already scored are skipped, so a schedule sim
 | `first-parent-only` | `true` | Measure a merge as what it brought to the target branch. |
 | `max-commits-per-run` | `1024` | Upper bound per run. Lower it for a first adoption. |
 | `index-batch-size` | `200` | Commits per index request. |
+| `index-ref` | `''` | Ref whose history is walked for pending commits. Empty uses `HEAD`. |
 
 ### Timeouts
 
@@ -132,7 +134,8 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 | `exclude-reverted-commits` | `true` | Analysing a revert also retroactively excludes what it reverted, so reverted work stops counting. |
 | `ignore-coverage` | `false` | Skip tests in the forked build. Much faster, no coverage data. |
 | `time-machine` | `true` | Resolve a historical commit's snapshot dependencies as of that commit. |
-| `dump-analysis` | `true` | Keep the analysis document for debugging. |
+| `dump-analysis` | `true` | Write the submission document to disk. Without `analysis-output-directory` it lands in a runner temporary file and is not collected. |
+| `analysis-output-directory` | `''` | Where the dumped submission document is written. Point it inside the log directory to have it uploaded; one document per commit, so mind artifact size. Scoring is server-side here, so no local HTML report is produced. |
 | `stop-on-first-failure` | `true` | Stop at the first commit that genuinely fails to analyse (timeout, OOM, failed analysis run). Commits codiqo excludes do not count. |
 | `require-full-history` | `true` | Refuse to run on a shallow or filtered clone. |
 | `skip-on-build-failure` | `true` | Record a commit whose build fails as an exclusion. Turn off and a failed or timed-out build fails the step instead. |
@@ -162,6 +165,7 @@ analysis cost against detail; none of them changes how effort is scored except w
 | `build-error-capture-limit` | `''` | Maximum characters of build output captured into a build-failure report. |
 | `jdt-use-shared-index` | `true` | Reuse the shared language-server index across runs. Much faster; turn off to force a clean index. |
 | `jdt-include-decompiled-sources` | `false` | Let the language server decompile dependency classes without sources. Slower, and rarely changes blast radius. |
+| `jdt-source-exclusions` | `''` | Comma-separated groupId prefixes whose `-sources.jar` is removed before the language server imports. **Replaces** the default list, which covers the Scala and Kotlin families whose source jars stall the import. Extend it if a dependency of yours ships non-Java sources and the import hangs. |
 | `lsp-query-timeout-seconds` | `''` | Timeout for a single language-server query, such as a call-hierarchy lookup. |
 | `max-requests` | `''` | Maximum concurrent HTTP requests the engine issues. |
 | `max-requests-per-host` | `''` | Maximum concurrent HTTP requests per host. |
