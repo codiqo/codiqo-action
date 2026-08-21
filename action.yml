@@ -536,7 +536,7 @@ runs:
 
     - name: Upload Codiqo logs
       if: always() && inputs.upload-logs == 'true'
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.log-artifact-name }}
         path: ${{ runner.temp }}/step-logs/
