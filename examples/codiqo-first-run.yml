@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -24,7 +24,7 @@ jobs:
         uses: codiqo/codiqo-action@main
         with:
           api-key: ${{ secrets.CODIQO_API_KEY }}
-          java-version: '21'
+          java-version: '25'
           commit-window: 'P7D'
           max-commits-per-run: 2
           ignore-coverage: true

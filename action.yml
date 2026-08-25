@@ -25,9 +25,9 @@ inputs:
     required: false
     default: '1.0-SNAPSHOT'
   java-version:
-    description: 'JDK to install. Set to an empty string to skip JDK setup entirely, for example when the workflow already ran actions/setup-java or the runner has a pre-provisioned JDK. It must be able to build your project, and Codiqo needs Java 21 or newer for its language server.'
+    description: 'JDK to install. Set to an empty string to skip JDK setup entirely, for example when the workflow already ran actions/setup-java or the runner has a pre-provisioned JDK. It must be able to build your project, and it must be Java 25 or newer: codiqo-maven-plugin declares requiredJavaVersion 25, and Maven refuses to execute a plugin whose prerequisite the running JDK cannot meet. The default is that floor rather than the newest release, so raise it when your project needs a newer toolchain.'
     required: false
-    default: '21'
+    default: '25'
   java-distribution:
     description: 'Distribution passed to actions/setup-java.'
     required: false
@@ -400,7 +400,7 @@ runs:
     # from every run. Small and immutable, unlike the language server's own index.
     #
     - name: Cache the Codiqo language server download
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ~/.cache/fetch
         key: codiqo-fetch-${{ runner.os }}-${{ inputs.codiqo-version }}-${{ inputs.jdtls-version }}
@@ -536,7 +536,7 @@ runs:
 
     - name: Upload Codiqo logs
       if: always() && inputs.upload-logs == 'true'
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.log-artifact-name }}
         path: ${{ runner.temp }}/step-logs/

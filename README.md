@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0          # required, see Requirements
 
@@ -49,8 +49,9 @@ The action is incremental: commits already scored are skipped, so a schedule sim
   and skips any commit whose parent is missing locally, so a shallow clone yields a run that
   succeeds having analysed nothing. The action refuses to start on a shallow or partially-cloned
   repository; set `require-full-history: false` if you accept that consequence.
-- **A JDK that can build your project**, and Java 21 or newer for the language server. Set
-  `java-version` accordingly, or `''` to manage the JDK yourself.
+- **A JDK that can build your project, Java 25 or newer.** The plugin declares
+  `requiredJavaVersion` 25, so Maven refuses to run it on anything older. Set `java-version`
+  accordingly, or `''` to manage the JDK yourself.
 - **Time.** Each commit runs a full `clean verify`. Give the job a generous `timeout-minutes`, cap
   the first run with `max-commits-per-run`, and consider `ignore-coverage: true` while trialling.
 
@@ -69,7 +70,7 @@ The action is incremental: commits already scored are skipped, so a schedule sim
 | Input | Default | Description |
 | --- | --- | --- |
 | `codiqo-version` | `1.0-SNAPSHOT` | Plugin version. Codiqo is pre-1.0, so a snapshot repository is added automatically. |
-| `java-version` | `21` | JDK to install. `''` skips JDK setup entirely. |
+| `java-version` | `25` | JDK to install, 25 or newer — the plugin's floor, not the newest release. `''` skips JDK setup entirely. |
 | `java-distribution` | `temurin` | Passed to `actions/setup-java`. |
 | `java-home` | `''` | Explicit JDK for the per-commit build and language server. |
 | `maven-command` | `auto` | `auto` prefers `./mvnw`, else `mvn`. This action does not install Maven. |
