@@ -25,15 +25,39 @@ inputs:
     required: false
     default: '1.0-SNAPSHOT'
   java-version:
-    description: 'JDK to install. Set to an empty string to skip JDK setup entirely, for example when the workflow already ran actions/setup-java or the runner has a pre-provisioned JDK. It must be able to build your project, and it must be Java 25 or newer: codiqo-maven-plugin declares requiredJavaVersion 25, and Maven refuses to execute a plugin whose prerequisite the running JDK cannot meet. The default is that floor rather than the newest release, so raise it when your project needs a newer toolchain.'
+    description: 'JDK to install. Set to an empty string to skip JDK setup entirely, for example when the workflow already ran actions/setup-java or the runner has a pre-provisioned JDK. It must be able to build your project, and it must be Java 21 or newer: codiqo-maven-plugin declares requiredJavaVersion 21, and Maven refuses to execute a plugin whose prerequisite the running JDK cannot meet. The default is that floor rather than the newest release, so raise it when your project needs a newer toolchain. Under build-tool: gradle it is also the JDK every analysed commit''s own wrapper runs on, and a Gradle release only accepts JDKs that predate it — so a default above the floor would fail every commit pinning an older wrapper.'
     required: false
-    default: '25'
+    default: '21'
   java-distribution:
     description: 'Distribution passed to actions/setup-java.'
     required: false
     default: 'temurin'
   java-home:
     description: 'Explicit JDK home for the per-commit build and the language server (-Dcodiqo.javaHome). Left empty they inherit JAVA_HOME and the java on PATH.'
+    required: false
+    default: ''
+  build-tool:
+    description: 'Which build tool drives the analysis: "maven" or "gradle". Gradle support does not cover the time machine or build-failure capture; see the Gradle section of the README.'
+    required: false
+    default: 'maven'
+  gradle-command:
+    description: 'Gradle executable, or "auto" to prefer the project wrapper (./gradlew) over a gradle on PATH. Gradle only.'
+    required: false
+    default: 'auto'
+  gradle-tasks:
+    description: 'Whitespace-separated tasks run before codiqoSubmitAnalysis on each commit, e.g. "test" or ":app:test :lib:test". Empty analyses without running tests, so changed-code coverage stays empty. Gradle only.'
+    required: false
+    default: 'test'
+  gradle-project-properties:
+    description: 'Newline-separated key=value pairs passed as -Pkey=value to every Gradle invocation, the Gradle counterpart of maven-user-properties. Never put secrets here; they would appear on the command line.'
+    required: false
+    default: ''
+  gradle-args:
+    description: 'Extra Gradle arguments, one per line, the Gradle counterpart of maven-args. A single-line value is split on whitespace for convenience. Gradle only: maven-args is never passed to Gradle, since Maven flags such as -ntp or a -P profile mean something else there.'
+    required: false
+    default: ''
+  analysis-max-heap:
+    description: 'Heap for the forked Codiqo analysis JVM, e.g. 8g. The Gradle counterpart of an -Xmx in maven-opts; the analysed project''s org.gradle.jvmargs does not apply to it. Gradle only.'
     required: false
     default: ''
   maven-command:
@@ -53,9 +77,9 @@ inputs:
     required: false
     default: 'false'
   cache:
-    description: 'Dependency cache for actions/setup-java ("maven", "gradle", or empty to disable). Disable it when an earlier step purges the local repository, or the restore will undo the purge.'
+    description: 'Dependency cache for actions/setup-java: "auto" follows build-tool, or name it explicitly ("maven", "gradle") or set it empty to disable. Do not leave it on "maven" for a Gradle-only repository — setup-java hashes **/pom.xml and fails the job outright when nothing matches. Disable it when an earlier step purges the local repository, or the restore will undo the purge.'
     required: false
-    default: 'maven'
+    default: 'auto'
 
   # ---------------------------------------------------------------------------- scope and filters
   commit-window:
@@ -379,6 +403,11 @@ runs:
         CODIQO_IN_PER_TEST_TIMEOUT: ${{ inputs.per-test-timeout }}
         CODIQO_IN_BUILD_TIMEOUT_MINUTES: ${{ inputs.build-timeout-minutes }}
         CODIQO_IN_TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}
+        CODIQO_IN_BUILD_TOOL: ${{ inputs.build-tool }}
+        CODIQO_IN_GRADLE_COMMAND: ${{ inputs.gradle-command }}
+        CODIQO_IN_GRADLE_TASKS: ${{ inputs.gradle-tasks }}
+        CODIQO_IN_GRADLE_PROJECT_PROPERTIES: ${{ inputs.gradle-project-properties }}
+        CODIQO_IN_GRADLE_ARGS: ${{ inputs.gradle-args }}
         CODIQO_IN_MAVEN_COMMAND: ${{ inputs.maven-command }}
         CODIQO_IN_MAVEN_ARGS: ${{ inputs.maven-args }}
         CODIQO_IN_MAVEN_USER_PROPERTIES: ${{ inputs.maven-user-properties }}
@@ -393,7 +422,12 @@ runs:
       with:
         java-version: ${{ inputs.java-version }}
         distribution: ${{ inputs.java-distribution }}
-        cache: ${{ inputs.cache }}
+        #
+        # "auto" resolves to the build tool actually in use. setup-java throws when its dependency
+        # glob matches nothing, and that error reaches core.setFailed — so a maven cache on a
+        # Gradle-only repository fails the whole job here, two steps in, rather than degrading.
+        #
+        cache: ${{ inputs.cache == 'auto' && (inputs.build-tool == 'gradle' && 'gradle' || 'maven') || inputs.cache }}
 
     #
     # The language server archive is fetched once and reused, so caching it removes a download
@@ -411,6 +445,7 @@ runs:
     # Must run after setup-java, which writes its own ~/.m2/settings.xml when given a server-id.
     #
     - name: Configure Maven settings
+      if: inputs.build-tool != 'gradle'
       shell: bash
       run: "$GITHUB_ACTION_PATH/scripts/prepare-maven.sh"
       env:
@@ -423,9 +458,23 @@ runs:
     # After the settings are in place, before anything else touches Maven.
     #
     - name: Resolve dependencies
-      if: inputs.resolve-dependencies == 'true'
+      if: inputs.resolve-dependencies == 'true' && inputs.build-tool != 'gradle'
       shell: bash
       run: "$GITHUB_ACTION_PATH/scripts/resolve-dependencies.sh"
+
+    #
+    # Writes the init script that applies the plugin to the analysed build without editing it.
+    # Must run before index-commits, which is the first step to invoke Gradle.
+    #
+    - name: Prepare the Codiqo Gradle init script
+      if: inputs.build-tool == 'gradle'
+      shell: bash
+      run: "$GITHUB_ACTION_PATH/scripts/prepare-gradle.sh"
+      env:
+        CODIQO_IN_VERSION: ${{ inputs.codiqo-version }}
+        CODIQO_IN_MANAGE_PLUGIN_REPOSITORY: ${{ inputs.manage-plugin-repository }}
+        CODIQO_IN_PLUGIN_REPOSITORY_URL: ${{ inputs.plugin-repository-url }}
+        CODIQO_IN_IGNORE_COVERAGE: ${{ inputs.ignore-coverage }}
 
     - name: Index commits
       id: index
@@ -449,7 +498,7 @@ runs:
     # Skipped when nothing is pending, so a quiet repository costs no resolution round-trip.
     #
     - name: Prepare the time-machine host extension
-      if: inputs.time-machine == 'true' && steps.index.outputs.missing-count != '0'
+      if: inputs.time-machine == 'true' && inputs.build-tool != 'gradle' && steps.index.outputs.missing-count != '0'
       shell: bash
       run: "$GITHUB_ACTION_PATH/scripts/prepare-time-machine.sh"
       env:
@@ -464,6 +513,7 @@ runs:
       run: "$GITHUB_ACTION_PATH/scripts/submit-analyses.sh"
       env:
         CODIQO_API_KEY: ${{ inputs.api-key }}
+        CODIQO_IN_ANALYSIS_MAX_HEAP: ${{ inputs.analysis-max-heap }}
         CODIQO_IN_VERSION: ${{ inputs.codiqo-version }}
         CODIQO_IN_API_URL: ${{ inputs.api-url }}
         CODIQO_IN_EXCLUDE_AUTHOR_EMAILS: ${{ inputs.exclude-author-emails }}

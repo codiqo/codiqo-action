@@ -42,18 +42,63 @@ The action is incremental: commits already scored are skipped, so a schedule sim
 
 ## Requirements
 
-- **A Maven project.** Gradle is not supported.
+- **A Maven or Gradle project.** Maven is the default; set `build-tool: gradle` for a Gradle
+  build, and read the Gradle section below first — it is not yet at full parity.
 - **A Linux runner.** The status heartbeat reads `/proc` and the per-commit deadline uses GNU
   `timeout`. Other platforms degrade rather than fail, but are untested.
 - **Full git history** — `fetch-depth: 0`. Codiqo walks history to find commits needing analysis
   and skips any commit whose parent is missing locally, so a shallow clone yields a run that
   succeeds having analysed nothing. The action refuses to start on a shallow or partially-cloned
   repository; set `require-full-history: false` if you accept that consequence.
-- **A JDK that can build your project, Java 25 or newer.** The plugin declares
-  `requiredJavaVersion` 25, so Maven refuses to run it on anything older. Set `java-version`
-  accordingly, or `''` to manage the JDK yourself.
+- **A JDK that can build your project, Java 21 or newer.** The plugin declares
+  `requiredJavaVersion` 21, so Maven refuses to run it on anything older. Set `java-version`
+  accordingly, or `''` to manage the JDK yourself. Under `build-tool: gradle` the same JDK runs
+  every analysed commit's own wrapper, so a newer one is not automatically better.
 - **Time.** Each commit runs a full `clean verify`. Give the job a generous `timeout-minutes`, cap
-  the first run with `max-commits-per-run`, and consider `ignore-coverage: true` while trialling.
+  the first run with `max-commits-per-run`, and consider `ignore-coverage: true` while trialling
+  (under Gradle, pair it with `gradle-tasks: ''` — see the Gradle section).
+
+## Gradle
+
+Set `build-tool: gradle`. The action then applies the Codiqo Gradle plugin through a generated
+init script, so none of your build files change, and runs `gradle-tasks` (default `test`) followed
+by `codiqoSubmitAnalysis` for each pending commit.
+
+Four differences from the Maven path are worth knowing before you enable it.
+
+**The workspace is checked out per commit.** The Maven goal clones the repository itself and builds
+each commit in a temporary tree. A Gradle build reads its entire model at startup, so it cannot
+re-target itself at another commit from inside a task — the action checks out each commit in the
+workspace instead and restores the original **ref** afterwards, including on failure. It does not
+restore file *content*: the checkout is `--force`, so uncommitted changes to tracked files would be
+overwritten. The action refuses to start when it finds any, rather than destroying them, so run this
+action before the steps that modify the checkout, and do not run other steps concurrently with it.
+
+**Tests are on the action's command line, not inside a fork.** `ignore-coverage: true` therefore
+does not skip them the way it does on Maven; it only drops jacoco and the coverage analysis. To skip
+tests under Gradle, set `gradle-tasks` to something cheaper (`classes`) or to `''`.
+
+**The JDK has to suit every wrapper you analyse.** Each commit runs its own `./gradlew`, and a
+Gradle release refuses a JDK newer than it knows about. Backfilling a window that spans a Gradle
+upgrade may need `java-version` lowered to what the oldest wrapper accepts.
+
+**Several features are Maven-only.** The time machine (`time-machine` is ignored), structured
+build-failure capture, and therefore degraded diff-only scoring of a failed build. A Gradle commit
+whose build fails is reported as a failure rather than scored from its diff, and historical commits
+resolve today's snapshot dependencies rather than the ones current at the time. The Gradle plugin
+also has no equivalent of the analysis-tuning inputs, so these are accepted and ignored under
+`build-tool: gradle`: `settings-xml`, `dump-analysis`, `move-detection`, `move-similarity-threshold`,
+`moved-line-coefficient`, `driver-score-cap-*`, `driver-factor-max-deviation`, `pmd-rules`,
+`pmd-min-priority`, `spotbugs-*`, `cpd-minimum-tile-size`, `diff-context-lines`,
+`build-error-capture-limit`, `max-requests*`, `jdt-source-exclusions`, `index-batch-size`,
+`agent-instruction*` and `build-timeout-minutes`. Scores are therefore not comparable across the two
+build tools when you have tuned any of them.
+
+Gradle-specific inputs: `gradle-command`, `gradle-tasks`, `gradle-project-properties` (the
+counterpart of `maven-user-properties`), `gradle-args` (the counterpart of `maven-args`, which is
+never passed to Gradle) and `analysis-max-heap`. The last one matters: the analysis runs in its own
+JVM, so the project's `org.gradle.jvmargs` does not size it, and an `-Xmx` in `maven-opts` does not
+reach it either. It defaults to 8g, which is worth lowering on a standard runner.
 
 ## Inputs
 
@@ -70,14 +115,20 @@ The action is incremental: commits already scored are skipped, so a schedule sim
 | Input | Default | Description |
 | --- | --- | --- |
 | `codiqo-version` | `1.0-SNAPSHOT` | Plugin version. Codiqo is pre-1.0, so a snapshot repository is added automatically. |
-| `java-version` | `25` | JDK to install, 25 or newer — the plugin's floor, not the newest release. `''` skips JDK setup entirely. |
+| `java-version` | `21` | JDK to install, 21 or newer — the plugin's floor, not the newest release. `''` skips JDK setup entirely. Under `build-tool: gradle` this JDK also runs each analysed commit's own wrapper, and a Gradle release rejects JDKs newer than itself, so raise it only as far as your oldest wrapper allows. |
 | `java-distribution` | `temurin` | Passed to `actions/setup-java`. |
 | `java-home` | `''` | Explicit JDK for the per-commit build and language server. |
+| `build-tool` | `maven` | `maven` or `gradle`. See the Gradle section — that path is not at full parity. |
+| `gradle-command` | `auto` | `auto` prefers `./gradlew`, else `gradle`. Gradle only. |
+| `gradle-tasks` | `test` | Whitespace-separated tasks run before `codiqoSubmitAnalysis` on each commit. Empty runs none, so the analysis has no coverage to read. Gradle only. |
+| `gradle-project-properties` | `''` | Newline-separated `key=value`, passed as `-Pkey=value`. The counterpart of `maven-user-properties`. Gradle only. |
+| `gradle-args` | `''` | Extra Gradle arguments, one per line. The counterpart of `maven-args`, which is never passed to Gradle. Gradle only. |
+| `analysis-max-heap` | `''` (plugin default `8g`) | Heap for the forked analysis JVM. The project's `org.gradle.jvmargs` does not size it. Gradle only. |
 | `maven-command` | `auto` | `auto` prefers `./mvnw`, else `mvn`. This action does not install Maven. |
 | `maven-home` | `''` | Maven home for the forked build. |
 | `jdtls-version` | `''` | Language server version override. |
 | `jdtls-use-snapshot` | `false` | Resolve the language server from Eclipse's snapshot channel; `jdtls-version` is then ignored. |
-| `cache` | `maven` | `actions/setup-java` cache. Set `''` to disable. |
+| `cache` | `auto` | `actions/setup-java` cache; `auto` follows `build-tool`. Name it explicitly (`maven`, `gradle`) or set `''` to disable. A `maven` cache on a Gradle-only repository fails the job: `setup-java` errors when its `**/pom.xml` glob matches nothing. |
 
 ### Scope and filters
 
@@ -119,7 +170,7 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 | --- | --- | --- |
 | `settings-xml` | `''` | Complete `settings.xml` content, written to `~/.m2/settings.xml`. |
 | `maven-user-properties` | `''` | Newline `key=value`, passed as `-Dkey=value`. Never secrets. |
-| `maven-args` | `''` | Extra arguments, one per line. |
+| `maven-args` | `''` | Extra arguments, one per line. Maven only; use `gradle-args` for Gradle. |
 | `maven-opts` | `''` | `MAVEN_OPTS`. The forked build inherits it. |
 | `maven-parallelism` | `''` | `-T` value, e.g. `1C`. Propagates into the forked build. |
 | `manage-plugin-repository` | `auto` | `auto` (snapshot versions only), `always`, `never`. |
@@ -133,7 +184,7 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 | --- | --- | --- |
 | `score-on-build-failure` | `false` | Score from the diff alone when a build fails, instead of excluding the commit. |
 | `exclude-reverted-commits` | `true` | Analysing a revert also retroactively excludes what it reverted, so reverted work stops counting. |
-| `ignore-coverage` | `false` | Skip tests in the forked build. Much faster, no coverage data. |
+| `ignore-coverage` | `false` | Skip tests in the forked build. Much faster, no coverage data. Maven only in that sense: under Gradle the tasks are on the action's own command line, so this drops jacoco and the coverage analysis but does not stop the tests — use `gradle-tasks` for that. |
 | `time-machine` | `true` | Resolve a historical commit's snapshot dependencies as of that commit. |
 | `dump-analysis` | `true` | Write the submission document to disk. Without `analysis-output-directory` it lands in a runner temporary file and is not collected. |
 | `analysis-output-directory` | `''` | Where the dumped submission document is written. Point it inside the log directory to have it uploaded; one document per commit, so mind artifact size. Scoring is server-side here, so no local HTML report is produced. |
@@ -207,6 +258,11 @@ Leave them empty unless you are deliberately recalibrating.
 | `logs-dir` | Directory holding the step and per-commit logs. |
 
 ## Private repositories
+
+This section is Maven-only: `settings-xml` is not read under `build-tool: gradle`, and
+`gradle-project-properties` reaches the command line, so it is no place for credentials. Give a
+Gradle build its credentials the way it already expects them — `~/.gradle/gradle.properties` or the
+environment, written by one of your own steps before this action runs.
 
 Pass a complete `settings.xml` through `settings-xml`, and any properties your POMs interpolate
 through `maven-user-properties`:

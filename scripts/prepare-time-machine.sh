@@ -62,16 +62,16 @@ XML
     printf '  </repositories>\n</project>\n'
 } > "$ext_pom"
 
-codiqo::read_lines_into extra_args "$CODIQO_WORK_DIR/mvn-args"
-codiqo::read_lines_into user_props "$CODIQO_WORK_DIR/mvn-props"
+codiqo::read_lines_into extra_args "$CODIQO_WORK_DIR/build-args"
+codiqo::read_lines_into user_props "$CODIQO_WORK_DIR/build-props"
 
-cmd=("$CODIQO_MVN" -B -ntp -e -U)
+cmd=("$CODIQO_BUILD_CMD" -B -ntp -e -U)
 cmd+=(${extra_args[@]+"${extra_args[@]}"})
 cmd+=(${user_props[@]+"${user_props[@]}"})
 cmd+=(-f "$ext_pom" dependency:build-classpath -DincludeScope=runtime "-Dmdep.outputFile=$ext_cp")
 
 rc=0
-codiqo::run_maven_step "codiqo-time-machine" "${cmd[@]}" || rc=$?
+codiqo::run_step "codiqo-time-machine" "${cmd[@]}" || rc=$?
 codiqo::emit_log_warnings "$CODIQO_LOGS_DIR/codiqo-time-machine.log"
 
 #

@@ -51,7 +51,7 @@ codiqo::read_lines_into() {
 
 #
 # Emit the tail of a log, used on failure. Kept separate so the three failure branches in
-# run_maven_step read the same.
+# run_step read the same.
 #
 codiqo::tail_log() {
     local log="$1" lines="${2:-${CODIQO_TAIL_LINES:-400}}"
@@ -66,23 +66,52 @@ codiqo::tail_log() {
 }
 
 #
-# Maven output is redirected to a file so the heartbeat stays readable, which would
+# Build output is redirected to a file so the heartbeat stays readable, which would
 # otherwise hide the plugin's own diagnostics. The two that matter most in practice are the
 # "deepen the clone" warning (a shallow checkout silently analyses nothing) and the
-# "time-machine is not loaded in the host Maven" warning, so re-surface WARNING/ERROR lines.
+# "time-machine is not loaded in the host Maven" warning, so re-surface those lines.
 #
+# The grammar is the build tool's, not codiqo's. Maven prefixes every line with its level;
+# Gradle prints a warn message bare, so anchoring on Maven's [WARNING] matched nothing on a
+# Gradle log and swallowed the very warnings this exists to surface. Gradle logs are matched
+# on the plugin's own "codiqo:" prefix plus the forked worker's slf4j-simple levels.
+#
+codiqo::_log_line_pattern() {
+    if [ "${CODIQO_BUILD_TOOL:-maven}" = "gradle" ]; then
+        printf '%s' '^(WARN|ERROR)[[:space:]]|^codiqo: '
+    else
+        printf '%s' '^\[(WARNING|ERROR)\]'
+    fi
+}
+
 codiqo::emit_log_warnings() {
-    local log="$1" limit="${2:-40}" found
+    local log="$1" limit="${2:-40}" found pattern
     if [ ! -f "$log" ]; then
         return 0
     fi
-    found=$(grep -c -E '^\[(WARNING|ERROR)\]' "$log" 2>/dev/null || true)
+    pattern=$(codiqo::_log_line_pattern)
+    found=$(grep -c -E "$pattern" "$log" 2>/dev/null || true)
     if [ -z "$found" ] || [ "$found" = "0" ]; then
         return 0
     fi
-    codiqo::group "$(basename "$log"): $found warning/error lines (last $limit)"
-    grep -E '^\[(WARNING|ERROR)\]' "$log" | tail -n "$limit" || true
+    codiqo::group "$(basename "$log"): $found flagged line(s) (last $limit)"
+    grep -E "$pattern" "$log" | tail -n "$limit" || true
     codiqo::endgroup
+}
+
+#
+# Did the forked analysis worker get its submission accepted? The engine logs the backend's
+# acceptance ("accepted analysis id: ... status: ...", or the degraded variant when the build
+# failed), which is the only evidence in the step log that the deliverable was produced. The
+# Gradle path needs it because a build can end BUILD FAILED — a Test task that hit its timeout —
+# long after codiqoSubmitAnalysis has posted.
+#
+codiqo::analysis_accepted() {
+    local log="$1"
+    if [ ! -f "$log" ]; then
+        return 1
+    fi
+    grep -q -a -E 'accepted (degraded )?analysis id:' "$log" 2> /dev/null
 }
 
 codiqo::_mem_summary() {
@@ -189,7 +218,7 @@ codiqo::heartbeat_wait() {
 # Set CODIQO_STEP_TIMEOUT_SECONDS to wrap the command in `timeout -k 60`. Returns the exit
 # status; 124/137 mean the deadline or a kill (GNU timeout, or an OOM kill).
 #
-codiqo::run_maven_step() {
+codiqo::run_step() {
     local name="$1"
     shift
     local log="$CODIQO_LOGS_DIR/${name}.log"
@@ -237,14 +266,30 @@ codiqo::assert_build_success() {
     # anywhere in the file turned every such exclusion into a failed step, which is a normal
     # backfill outcome, not a failure.
     #
+    #
+    # The two build tools word this differently, and the wordings overlap: Gradle's BUILD SUCCESSFUL
+    # contains Maven's BUILD SUCCESS as a prefix, so a shared pattern would read a Gradle success
+    # correctly and then miss BUILD FAILED entirely. Each tool gets its own pair.
+    #
+    local pattern success failure
+    if [ "${CODIQO_BUILD_TOOL:-maven}" = "gradle" ]; then
+        pattern='BUILD (SUCCESSFUL|FAILED)'
+        success='BUILD SUCCESSFUL'
+        failure='BUILD FAILED'
+    else
+        pattern='BUILD (SUCCESS|FAILURE)'
+        success='BUILD SUCCESS'
+        failure='BUILD FAILURE'
+    fi
+
     local result
-    result=$(grep -aoE 'BUILD (SUCCESS|FAILURE)' "$log" 2> /dev/null | tail -1)
+    result=$(grep -aoE "$pattern" "$log" 2> /dev/null | tail -1)
     if [ -z "$result" ]; then
-        printf 'did not log BUILD SUCCESS'
+        printf 'did not log %s' "$success"
         return 1
     fi
-    if [ "$result" = 'BUILD FAILURE' ]; then
-        printf 'logged BUILD FAILURE despite exit 0'
+    if [ "$result" = "$failure" ]; then
+        printf 'logged %s despite exit 0' "$failure"
         return 1
     fi
     return 0

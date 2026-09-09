@@ -174,31 +174,67 @@ if [ -z "$branch" ]; then
     codiqo::log "no branch could be derived from the event; letting the plugin auto-detect."
 fi
 
-# ----------------------------------------------------------------------------- maven command
+# -------------------------------------------------------------------------------- build tool
 
-maven_command="${CODIQO_IN_MAVEN_COMMAND:-auto}"
-if [ "$maven_command" = "auto" ]; then
-    if [ -x "./mvnw" ]; then
-        maven_command="./mvnw"
-        codiqo::log "using the project's Maven wrapper (./mvnw)."
-    else
-        maven_command="mvn"
+build_tool="${CODIQO_IN_BUILD_TOOL:-maven}"
+case "$build_tool" in
+    maven | gradle) ;;
+    *) codiqo::die "build-tool must be 'maven' or 'gradle', not '$build_tool'." ;;
+esac
+
+# ----------------------------------------------------------------------------- build command
+
+if [ "$build_tool" = "gradle" ]; then
+    build_command="${CODIQO_IN_GRADLE_COMMAND:-auto}"
+    if [ "$build_command" = "auto" ]; then
+        #
+        # The wrapper is strongly preferred over a PATH gradle: it pins the distribution the project
+        # was written against, and analysing a historical commit means running whatever wrapper that
+        # commit shipped.
+        #
+        if [ -x "./gradlew" ]; then
+            build_command="./gradlew"
+            codiqo::log "using the project's Gradle wrapper (./gradlew)."
+        else
+            build_command="gradle"
+        fi
     fi
+    label="gradle command   "
+else
+    build_command="${CODIQO_IN_MAVEN_COMMAND:-auto}"
+    if [ "$build_command" = "auto" ]; then
+        if [ -x "./mvnw" ]; then
+            build_command="./mvnw"
+            codiqo::log "using the project's Maven wrapper (./mvnw)."
+        else
+            build_command="mvn"
+        fi
+    fi
+    label="maven command    "
 fi
-if ! command -v "$maven_command" > /dev/null 2>&1 && [ ! -x "$maven_command" ]; then
-    codiqo::die "maven command '$maven_command' was not found on PATH and is not an executable file."
+if ! command -v "$build_command" > /dev/null 2>&1 && [ ! -x "$build_command" ]; then
+    codiqo::die "$label '$build_command' was not found on PATH and is not an executable file."
 fi
 
-# --------------------------------------------------------- maven arguments and user properties
+# --------------------------------------------------------- build arguments and user properties
 
 #
 # One argument per line. Whitespace splitting is kept only for a single-line value, so
 # `maven-args: '-T 1C -Dfoo=bar'` keeps working while a multi-line value can carry paths
 # containing spaces.
 #
-args_file="$CODIQO_WORK_DIR/mvn-args"
+# Tool-aware for the same reason the properties below are: the two tools do not share a flag
+# grammar. `-ntp` is not a Gradle option at all, and `-Pci` is a profile to Maven but a project
+# property to Gradle — so passing maven-args to Gradle would either abort the build or silently
+# mean something else.
+#
+args_file="$CODIQO_WORK_DIR/build-args"
 : > "$args_file"
-raw_args="${CODIQO_IN_MAVEN_ARGS:-}"
+if [ "$build_tool" = "gradle" ]; then
+    raw_args="${CODIQO_IN_GRADLE_ARGS:-}"
+else
+    raw_args="${CODIQO_IN_MAVEN_ARGS:-}"
+fi
 if [ -n "$raw_args" ]; then
     case "$raw_args" in
         *"
@@ -221,28 +257,41 @@ fi
 # key=value per line, split at the FIRST '=' so values may contain '='. Emitted as
 # individual -Dkey=value elements so a value containing spaces survives.
 #
-props_file="$CODIQO_WORK_DIR/mvn-props"
+#
+# One file, whichever tool is driving: only one of the two inputs can be in play per run, and the
+# only difference downstream is the flag each tool spells its user properties with.
+#
+props_file="$CODIQO_WORK_DIR/build-props"
 : > "$props_file"
-if [ -n "${CODIQO_IN_MAVEN_USER_PROPERTIES:-}" ]; then
-    printf '%s\n' "${CODIQO_IN_MAVEN_USER_PROPERTIES}" | while IFS= read -r line; do
+if [ "$build_tool" = "gradle" ]; then
+    props_input="${CODIQO_IN_GRADLE_PROJECT_PROPERTIES:-}"
+    props_label="gradle-project-properties"
+    props_flag="-P"
+else
+    props_input="${CODIQO_IN_MAVEN_USER_PROPERTIES:-}"
+    props_label="maven-user-properties"
+    props_flag="-D"
+fi
+if [ -n "$props_input" ]; then
+    printf '%s\n' "$props_input" | while IFS= read -r line; do
         trimmed="${line#"${line%%[![:space:]]*}"}"
         trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
         case "$trimmed" in '' | '#'*) continue ;; esac
         case "$trimmed" in
             *=*) : ;;
             *)
-                codiqo::error "maven-user-properties line '$trimmed' is not key=value."
+                codiqo::error "$props_label line '$trimmed' is not key=value."
                 exit 1
                 ;;
         esac
         key="${trimmed%%=*}"
         case "$key" in
             *[[:space:]]* | '')
-                codiqo::error "maven-user-properties key '$key' is empty or contains whitespace."
+                codiqo::error "$props_label key '$key' is empty or contains whitespace."
                 exit 1
                 ;;
         esac
-        printf -- '-D%s\n' "$trimmed" >> "$props_file"
+        printf -- '%s%s\n' "$props_flag" "$trimmed" >> "$props_file"
     done
 fi
 
@@ -257,7 +306,16 @@ codiqo::export CODIQO_BUILD_TIMEOUT_MINUTES "$build_timeout_minutes"
 codiqo::export CODIQO_TEST_TIMEOUT_MINUTES "$test_timeout_minutes"
 codiqo::export CODIQO_PER_TEST_TIMEOUT_MINUTES "$per_test_minutes"
 codiqo::export CODIQO_BRANCH "$branch"
-codiqo::export CODIQO_MVN "$maven_command"
+codiqo::export CODIQO_BUILD_TOOL "$build_tool"
+#
+# `-` rather than `:-`: the composite action always sets this variable, so an empty value is the
+# documented way to analyse without running tests. `:-` would substitute on empty too and quietly
+# reinstate `test`, making that opt-out unreachable. Newlines collapse to spaces because the export
+# travels through GITHUB_ENV as a single KEY=value line, which a block scalar would break.
+#
+gradle_tasks=$(printf '%s' "${CODIQO_IN_GRADLE_TASKS-test}" | tr '\n' ' ')
+codiqo::export CODIQO_GRADLE_TASKS "$gradle_tasks"
+codiqo::export CODIQO_BUILD_CMD "$build_command"
 codiqo::export CODIQO_HEARTBEAT_INTERVAL "${CODIQO_IN_HEARTBEAT_INTERVAL:-30}"
 codiqo::export CODIQO_TAIL_LINES "${CODIQO_IN_TAIL_LINES:-400}"
 codiqo::export CODIQO_MISSING_FILE "$CODIQO_WORK_DIR/missing-analyses.txt"
@@ -269,7 +327,8 @@ fi
 codiqo::group "resolved codiqo configuration"
 codiqo::log "plugin version   : ${CODIQO_IN_VERSION:-unset}"
 codiqo::log "api url          : ${CODIQO_IN_API_URL:-default}"
-codiqo::log "maven command    : $maven_command"
+codiqo::log "build tool       : $build_tool"
+codiqo::log "$label: $build_command"
 codiqo::log "branch           : ${branch:-<auto-detect>}"
 codiqo::log "commit window    : $commit_window"
 codiqo::log "per-commit limit : ${per_commit_minutes}m"
