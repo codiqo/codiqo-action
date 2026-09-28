@@ -171,7 +171,7 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 | `settings-xml` | `''` | Complete `settings.xml` content, written to `~/.m2/settings.xml`. |
 | `maven-user-properties` | `''` | Newline `key=value`, passed as `-Dkey=value`. Never secrets. |
 | `maven-args` | `''` | Extra arguments, one per line. Maven only; use `gradle-args` for Gradle. |
-| `maven-opts` | `''` | `MAVEN_OPTS`. The forked build inherits it. |
+| `maven-opts` | `''` | `MAVEN_OPTS`. The forked build inherits it. Without an `-Xmx` here or in the job's `MAVEN_OPTS` the analysis JVM gets a quarter of the runner's RAM, and the action warns. |
 | `maven-parallelism` | `''` | `-T` value, e.g. `1C`. Propagates into the forked build. |
 | `manage-plugin-repository` | `auto` | `auto` (snapshot versions only), `always`, `never`. |
 | `plugin-repository-url` | Central snapshots | Where the plugin and its extension are resolved from. |

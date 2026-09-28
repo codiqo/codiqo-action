@@ -324,6 +324,14 @@ if [ -n "${CODIQO_IN_MAVEN_OPTS:-}" ]; then
     codiqo::export MAVEN_OPTS "${CODIQO_IN_MAVEN_OPTS}"
 fi
 
+# Maven runs the analysis in its own JVM, so an unsized heap is a quarter of the runner's RAM: enough
+# for most projects, and a silent OutOfMemoryError in copy-paste detection or diagnostics for a large
+# one, which then fails every scheduled run on the same commit.
+effective_maven_opts="${CODIQO_IN_MAVEN_OPTS:-${MAVEN_OPTS:-}}"
+if [ "$build_tool" = "maven" ] && ! printf '%s' "$effective_maven_opts" | grep -qE -- '-Xmx|MaxRAMPercentage|MaxRAM='; then
+    codiqo::warn "MAVEN_OPTS sets no heap limit, so the analysis JVM gets a quarter of this runner's memory. A large project can run out of it; set -Xmx through maven-opts or the job's MAVEN_OPTS."
+fi
+
 codiqo::group "resolved codiqo configuration"
 codiqo::log "plugin version   : ${CODIQO_IN_VERSION:-unset}"
 codiqo::log "api url          : ${CODIQO_IN_API_URL:-default}"
