@@ -29,6 +29,7 @@ jobs:
           max-commits-per-run: 2
           ignore-coverage: true
           per-commit-timeout: '90m'
+          maven-parallelism: '1C'
 
       # The number that matters. A completed analysis reporting zero callers means the language
       # server found no Java model — usually a settings.xml or parent-POM resolution problem.

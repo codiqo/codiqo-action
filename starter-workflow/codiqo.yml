@@ -25,3 +25,4 @@ jobs:
         with:
           api-key: ${{ secrets.CODIQO_API_KEY }}
           java-version: '25'
+          maven-parallelism: '1C'

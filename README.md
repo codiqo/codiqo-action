@@ -36,6 +36,9 @@ jobs:
       - uses: codiqo/codiqo-action@main
         with:
           api-key: ${{ secrets.CODIQO_API_KEY }}
+          # One Maven thread per runner core for the per-commit build. Lower it, or remove it to build
+          # serially, if a commit dies with exit 137: each concurrently built module may fork a test JVM.
+          maven-parallelism: '1C'
 ```
 
 The action is incremental: commits already scored are skipped, so a schedule simply catches up.
@@ -172,7 +175,7 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 | `maven-user-properties` | `''` | Newline `key=value`, passed as `-Dkey=value`. Never secrets. |
 | `maven-args` | `''` | Extra arguments, one per line. Maven only; use `gradle-args` for Gradle. |
 | `maven-opts` | `''` | `MAVEN_OPTS`. The forked build inherits it. Without an `-Xmx` here or in the job's `MAVEN_OPTS` the analysis JVM gets a quarter of the runner's RAM, and the action warns. |
-| `maven-parallelism` | `''` | `-T` value, e.g. `1C`. Propagates into the forked build. |
+| `maven-parallelism` | `''` | `-T` value, e.g. `1C`, which the templates set. Propagates into the forked build; each concurrently built module may fork its own test JVM, so lower it on exit 137. Maven only. |
 | `manage-plugin-repository` | `auto` | `auto` (snapshot versions only), `always`, `never`. |
 | `plugin-repository-url` | Central snapshots | Where the plugin and its extension are resolved from. |
 | `time-machine-repositories` | `''` | Extra `id=url` lines for resolving the extension privately. |

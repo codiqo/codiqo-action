@@ -31,3 +31,6 @@ jobs:
         with:
           api-key: ${{ secrets.CODIQO_API_KEY }}
           java-version: '25'   # 25 or newer, and able to build your project
+          # One Maven thread per runner core for the per-commit build. Lower it, or remove it to build
+          # serially, if a commit dies with exit 137: each concurrently built module may fork a test JVM.
+          maven-parallelism: '1C'

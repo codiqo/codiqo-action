@@ -34,6 +34,7 @@ jobs:
         with:
           api-key: ${{ secrets.CODIQO_API_KEY }}
           java-version: '25'
+          maven-parallelism: '1C'
 
           # Properties your POMs interpolate. These reach the host Maven; the profile below is
           # what carries them into m2e and into the forked per-commit build.
