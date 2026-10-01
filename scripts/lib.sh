@@ -169,6 +169,38 @@ codiqo::_cpu_sample() {
 }
 
 #
+# Module progress from the file the forked Maven build's event spy appends to: one
+# tab-separated line per SESSION (module count), STARTED, SUCCESS, FAILED or SKIPPED
+# module. Prints nothing until the file has content, so a plugin too old to write it
+# leaves the status line as it was. Names the modules started but not yet finished,
+# which is where a wedged build is stuck, with artifactIds only to keep the line short.
+#
+codiqo::_build_progress() {
+    local file="$1"
+    if [ -z "$file" ] || [ ! -s "$file" ]; then
+        return 0
+    fi
+    awk -F '\t' '
+        $2 == "SESSION" { total = $3 }
+        $2 == "STARTED" { running[$3] = 1; order[++n] = $3 }
+        $2 == "SUCCESS" || $2 == "FAILED" || $2 == "SKIPPED" { done++; delete running[$3] }
+        $2 == "FAILED" { failed++ }
+        END {
+            shown = 0; more = 0; names = ""
+            for (i = 1; i <= n; i++) {
+                if (!(order[i] in running)) continue
+                if (shown == 3) { more++; continue }
+                id = order[i]; sub(/^[^:]*:/, "", id)
+                names = names (shown++ ? ", " : "") id
+            }
+            printf " | modules %d/%s done", done, (total == "" ? "?" : total)
+            if (failed) printf " (%d failed)", failed
+            if (shown) printf ", running: %s", names
+            if (more) printf " (+%d)", more
+        }' "$file"
+}
+
+#
 # Wait for a pid, printing one status line per interval. Two reasons this exists rather
 # than letting Maven stream: GitHub abandons a job it believes has lost contact with the
 # runner, and a "+0 lines" delta is the clearest signal that a build has wedged rather
@@ -200,10 +232,11 @@ codiqo::heartbeat_wait() {
             lines_now=$(wc -l < "$log" | tr -d ' ')
         fi
         codiqo::_cpu_sample
-        printf '[status] %s: %ss elapsed | %s | %s | %s %s | log %s lines (+%s)\n' \
+        printf '[status] %s: %ss elapsed | %s | %s | %s %s | log %s lines (+%s)%s\n' \
             "$label" "$elapsed" "$(codiqo::_mem_summary)" "$(codiqo::_top_process)" \
             "$CODIQO_CPU_TEXT" "$(codiqo::_load_average)" \
-            "$lines_now" "$((lines_now - lines_prev))"
+            "$lines_now" "$((lines_now - lines_prev))" \
+            "$(codiqo::_build_progress "${CODIQO_PROGRESS_FILE:-}")"
         lines_prev="$lines_now"
     done
 

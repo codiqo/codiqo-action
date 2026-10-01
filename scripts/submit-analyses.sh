@@ -290,9 +290,17 @@ for commit in "${commits[@]}"; do
     if [ -n "${CODIQO_IN_AGENT_INSTRUCTION_FILES:-}" ]; then cmd+=("-Dcodiqo.llm.conventionFiles=${CODIQO_IN_AGENT_INSTRUCTION_FILES}"); fi
     if [ -n "${CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS:-}" ]; then cmd+=("-Dcodiqo.llm.conventionFilesMaxChars=${CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS}"); fi
 
+    #
+    # The forked build's event spy appends module progress here for the heartbeat to report.
+    # It sits beside the commit's log so the upload keeps each module's duration as well.
+    #
+    progress="$CODIQO_LOGS_DIR/progress-${commit}.tsv"
+    rm -f "$progress"
+    cmd+=("-Dcodiqo.buildProgressFile=${progress}")
+
     rc=0
     log="$CODIQO_LOGS_DIR/submit-${commit}.log"
-    CODIQO_STEP_TIMEOUT_SECONDS="$CODIQO_PER_COMMIT_TIMEOUT_SECONDS" \
+    CODIQO_STEP_TIMEOUT_SECONDS="$CODIQO_PER_COMMIT_TIMEOUT_SECONDS" CODIQO_PROGRESS_FILE="$progress" \
         codiqo::run_step "submit-${commit}" "${cmd[@]}" || rc=$?
     codiqo::emit_log_warnings "$log"
     codiqo::report_commit_result "$commit" "$index" "$total" "$rc" "$log" "$loop_start" || exit $?
