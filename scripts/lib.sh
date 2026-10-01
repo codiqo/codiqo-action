@@ -169,9 +169,11 @@ codiqo::_cpu_sample() {
 }
 
 #
-# Echo the module progress lines appended since the last call, one log line per event, from
-# the file the forked Maven build's event spy, or the Gradle plugin's build service, writes:
-# tab-separated SESSION (module count), STARTED, SUCCESS, FAILED or SKIPPED lines. A plugin
+# Echo the progress lines appended since the last call, one log line per event, from the file
+# the plugin writes during a commit: tab-separated SESSION (module count), STARTED, SUCCESS,
+# FAILED or SKIPPED lines for each module the build (the Maven fork's event spy or the Gradle
+# build service) works through, and STAGE_STARTED, STAGE_FINISHED or STAGE_FAILED lines for
+# each analysis stage, with its duration and an optional detail such as the peak heap. A plugin
 # too old to write the file leaves the log as it was.
 #
 # Only newline-terminated lines are read, so a line caught mid-write waits for the next call.
@@ -192,6 +194,12 @@ codiqo::_emit_progress() {
         $2 == "SESSION" { total = $3 }
         $2 == "SUCCESS" || $2 == "FAILED" || $2 == "SKIPPED" { done++ }
         NR <= from { next }
+        $2 == "STAGE_STARTED" { printf "[stage] %s started\n", $3; next }
+        $2 == "STAGE_FINISHED" || $2 == "STAGE_FAILED" {
+            secs = int($4 / 1000)
+            printf "[stage] %s %s in %dm%02ds%s\n", $3, ($2 == "STAGE_FAILED" ? "FAILED" : "finished"), secs / 60, secs % 60, ($5 == "" ? "" : " (" $5 ")")
+            next
+        }
         {
             # without the groupId (Maven) or the leading colon (Gradle)
             id = $3; sub(/^[^:]*:/, "", id)
