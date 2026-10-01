@@ -169,36 +169,42 @@ codiqo::_cpu_sample() {
 }
 
 #
-# Module progress from the file the forked Maven build's event spy, or the Gradle plugin's
-# build service, appends to: one tab-separated line per SESSION (module count), STARTED,
-# SUCCESS, FAILED or SKIPPED module. Prints nothing until the file has content, so a plugin
-# too old to write it leaves the status line as it was. Names the modules started but not
-# yet finished, which is where a wedged build is stuck, without the groupId (Maven) or the
-# leading colon (Gradle) to keep the line short.
+# Echo the module progress lines appended since the last call, one log line per event, from
+# the file the forked Maven build's event spy, or the Gradle plugin's build service, writes:
+# tab-separated SESSION (module count), STARTED, SUCCESS, FAILED or SKIPPED lines. A plugin
+# too old to write the file leaves the log as it was.
 #
-codiqo::_build_progress() {
-    local file="$1"
+# Only newline-terminated lines are read, so a line caught mid-write waits for the next call.
+# The whole file is scanned each time to keep the done count, which stays cheap at a few
+# hundred modules. Called directly rather than in $(...), so CODIQO_PROGRESS_SEEN survives.
+#
+codiqo::_emit_progress() {
+    local file="$1" complete
     if [ -z "$file" ] || [ ! -s "$file" ]; then
         return 0
     fi
-    awk -F '\t' '
+    complete=$(wc -l < "$file" | tr -d ' ')
+    if [ "$complete" -le "${CODIQO_PROGRESS_SEEN:-0}" ]; then
+        return 0
+    fi
+    awk -F '\t' -v from="${CODIQO_PROGRESS_SEEN:-0}" -v to="$complete" '
+        NR > to { exit }
         $2 == "SESSION" { total = $3 }
-        $2 == "STARTED" { running[$3] = 1; order[++n] = $3 }
-        $2 == "SUCCESS" || $2 == "FAILED" || $2 == "SKIPPED" { done++; delete running[$3] }
-        $2 == "FAILED" { failed++ }
-        END {
-            shown = 0; more = 0; names = ""
-            for (i = 1; i <= n; i++) {
-                if (!(order[i] in running)) continue
-                if (shown == 3) { more++; continue }
-                id = order[i]; sub(/^[^:]*:/, "", id)
-                names = names (shown++ ? ", " : "") id
+        $2 == "SUCCESS" || $2 == "FAILED" || $2 == "SKIPPED" { done++ }
+        NR <= from { next }
+        {
+            # without the groupId (Maven) or the leading colon (Gradle)
+            id = $3; sub(/^[^:]*:/, "", id)
+            if ($2 == "SESSION") {
+                printf "[module] building %s modules\n", $3
+            } else if ($2 == "STARTED") {
+                printf "[module] started %s\n", id
+            } else {
+                secs = int($4 / 1000)
+                printf "[module] %d/%s %s %s in %dm%02ds\n", done, (total == "" ? "?" : total), $2, id, secs / 60, secs % 60
             }
-            printf " | modules %d/%s done", done, (total == "" ? "?" : total)
-            if (failed) printf " (%d failed)", failed
-            if (shown) printf ", running: %s", names
-            if (more) printf " (+%d)", more
         }' "$file"
+    CODIQO_PROGRESS_SEEN="$complete"
 }
 
 #
@@ -216,6 +222,7 @@ codiqo::heartbeat_wait() {
     local waited=0 lines_prev=0 lines_now elapsed slice
     CODIQO_CPU_BUSY_PREV=0
     CODIQO_CPU_TOTAL_PREV=0
+    CODIQO_PROGRESS_SEEN=0
     codiqo::_cpu_sample
 
     while kill -0 "$pid" 2> /dev/null; do
@@ -223,6 +230,7 @@ codiqo::heartbeat_wait() {
         if [ "$slice" -gt "$interval" ]; then slice="$interval"; fi
         sleep "$slice"
         waited=$((waited + slice))
+        codiqo::_emit_progress "${CODIQO_PROGRESS_FILE:-}"
         if [ "$waited" -lt "$interval" ]; then
             continue
         fi
@@ -233,13 +241,14 @@ codiqo::heartbeat_wait() {
             lines_now=$(wc -l < "$log" | tr -d ' ')
         fi
         codiqo::_cpu_sample
-        printf '[status] %s: %ss elapsed | %s | %s | %s %s | log %s lines (+%s)%s\n' \
+        printf '[status] %s: %ss elapsed | %s | %s | %s %s | log %s lines (+%s)\n' \
             "$label" "$elapsed" "$(codiqo::_mem_summary)" "$(codiqo::_top_process)" \
             "$CODIQO_CPU_TEXT" "$(codiqo::_load_average)" \
-            "$lines_now" "$((lines_now - lines_prev))" \
-            "$(codiqo::_build_progress "${CODIQO_PROGRESS_FILE:-}")"
+            "$lines_now" "$((lines_now - lines_prev))"
         lines_prev="$lines_now"
     done
+    # the modules that finished in the last slice before the process exited
+    codiqo::_emit_progress "${CODIQO_PROGRESS_FILE:-}"
 
     wait "$pid"
 }

@@ -349,10 +349,10 @@ understated blast radius, because the language server silently ended up with no 
 
 Every Maven invocation writes to its own file under `${{ runner.temp }}/step-logs/`, uploaded as
 an artifact. A status line prints on a heartbeat so a long job stays visibly alive, and warning and
-error lines are echoed back into the live log. During a commit build the status line also
-counts finished modules (Maven reactor modules or Gradle projects) and names the ones still
-running, read from `progress-<commit>.tsv` beside the commit's log, which also records each
-module's duration.
+error lines are echoed back into the live log. During a commit build each module (a Maven
+reactor module or a Gradle project) is also logged as it starts and finishes, for example
+`[module] 319/448 SUCCESS jetty-ee9-servlets in 1m42s`, read from `progress-<commit>.tsv` beside
+the commit's log.
 
 GitHub masks registered secrets in the **live** log only — artifact bytes are uploaded verbatim.
 List any sensitive environment variable in `redact-env-names` and the action scrubs its value, its
