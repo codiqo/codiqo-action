@@ -212,9 +212,17 @@ for commit in "${commits[@]}"; do
         if [ -n "${CODIQO_IN_LSP_QUERY_TIMEOUT_SECONDS:-}" ]; then cmd+=("-Pcodiqo.lspQueryTimeoutSeconds=${CODIQO_IN_LSP_QUERY_TIMEOUT_SECONDS}"); fi
         if [ -n "${CODIQO_IN_ANALYSIS_OUTPUT_DIRECTORY:-}" ]; then cmd+=("-Pcodiqo.outputDirectory=${CODIQO_IN_ANALYSIS_OUTPUT_DIRECTORY}"); fi
 
+        #
+        # The plugin's build service appends project progress here, in the same format the Maven
+        # fork's event spy writes, for the heartbeat to report.
+        #
+        progress="$CODIQO_LOGS_DIR/progress-${commit}.tsv"
+        rm -f "$progress"
+        cmd+=("-Pcodiqo.buildProgressFile=${progress}")
+
         rc=0
         log="$CODIQO_LOGS_DIR/submit-${commit}.log"
-        CODIQO_STEP_TIMEOUT_SECONDS="$CODIQO_PER_COMMIT_TIMEOUT_SECONDS" \
+        CODIQO_STEP_TIMEOUT_SECONDS="$CODIQO_PER_COMMIT_TIMEOUT_SECONDS" CODIQO_PROGRESS_FILE="$progress" \
             codiqo::run_step "submit-${commit}" "${cmd[@]}" || rc=$?
         if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
             #

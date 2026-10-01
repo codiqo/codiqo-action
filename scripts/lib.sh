@@ -169,11 +169,12 @@ codiqo::_cpu_sample() {
 }
 
 #
-# Module progress from the file the forked Maven build's event spy appends to: one
-# tab-separated line per SESSION (module count), STARTED, SUCCESS, FAILED or SKIPPED
-# module. Prints nothing until the file has content, so a plugin too old to write it
-# leaves the status line as it was. Names the modules started but not yet finished,
-# which is where a wedged build is stuck, with artifactIds only to keep the line short.
+# Module progress from the file the forked Maven build's event spy, or the Gradle plugin's
+# build service, appends to: one tab-separated line per SESSION (module count), STARTED,
+# SUCCESS, FAILED or SKIPPED module. Prints nothing until the file has content, so a plugin
+# too old to write it leaves the status line as it was. Names the modules started but not
+# yet finished, which is where a wedged build is stuck, without the groupId (Maven) or the
+# leading colon (Gradle) to keep the line short.
 #
 codiqo::_build_progress() {
     local file="$1"
