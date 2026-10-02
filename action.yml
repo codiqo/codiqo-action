@@ -164,7 +164,11 @@ inputs:
     required: false
     default: ''
   maven-opts:
-    description: 'Value for MAVEN_OPTS. The forked per-commit build inherits it, so size any -Xmx with several concurrent JVMs in mind.'
+    description: 'Value for MAVEN_OPTS. It sizes the analysis JVM and the language server; the forked per-commit build inherits it too unless fork-maven-opts is set, so size any -Xmx with several concurrent JVMs in mind.'
+    required: false
+    default: ''
+  fork-maven-opts:
+    description: 'MAVEN_OPTS for the forked per-commit build only (-Dcodiqo.forkMavenOpts). Empty, the fork inherits maven-opts. Set it when the analysis needs a larger heap than the build, and repeat any -D system property the project''s own build relies on, since it replaces the inherited value whole. Maven only.'
     required: false
     default: ''
   maven-parallelism:
@@ -557,6 +561,7 @@ runs:
         CODIQO_IN_SPOTBUGS_OMIT_VISITORS: ${{ inputs.spotbugs-omit-visitors }}
         CODIQO_IN_CPD_MINIMUM_TILE_SIZE: ${{ inputs.cpd-minimum-tile-size }}
         CODIQO_IN_CPD_IGNORE_IDENTIFIERS: ${{ inputs.cpd-ignore-identifiers }}
+        CODIQO_IN_FORK_MAVEN_OPTS: ${{ inputs.fork-maven-opts }}
         CODIQO_IN_DIFF_CONTEXT_LINES: ${{ inputs.diff-context-lines }}
         CODIQO_IN_BUILD_ERROR_CAPTURE_LIMIT: ${{ inputs.build-error-capture-limit }}
         CODIQO_IN_MOVE_DETECTION: ${{ inputs.move-detection }}

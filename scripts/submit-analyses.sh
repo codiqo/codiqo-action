@@ -285,6 +285,7 @@ for commit in "${commits[@]}"; do
     if [ -n "${CODIQO_IN_SPOTBUGS_OMIT_VISITORS:-}" ]; then cmd+=("-Dcodiqo.spotbugsOmitVisitors=${CODIQO_IN_SPOTBUGS_OMIT_VISITORS}"); fi
     if [ -n "${CODIQO_IN_CPD_MINIMUM_TILE_SIZE:-}" ]; then cmd+=("-Dcodiqo.cpdMinimumTileSize=${CODIQO_IN_CPD_MINIMUM_TILE_SIZE}"); fi
     if [ -n "${CODIQO_IN_CPD_IGNORE_IDENTIFIERS:-}" ]; then cmd+=("-Dcodiqo.cpdIgnoreIdentifiers=${CODIQO_IN_CPD_IGNORE_IDENTIFIERS}"); fi
+    if [ -n "${CODIQO_IN_FORK_MAVEN_OPTS:-}" ]; then cmd+=("-Dcodiqo.forkMavenOpts=${CODIQO_IN_FORK_MAVEN_OPTS}"); fi
     if [ -n "${CODIQO_IN_DIFF_CONTEXT_LINES:-}" ]; then cmd+=("-Dcodiqo.diffContextLines=${CODIQO_IN_DIFF_CONTEXT_LINES}"); fi
     if [ -n "${CODIQO_IN_BUILD_ERROR_CAPTURE_LIMIT:-}" ]; then cmd+=("-Dcodiqo.buildErrorCaptureLimit=${CODIQO_IN_BUILD_ERROR_CAPTURE_LIMIT}"); fi
     if [ -n "${CODIQO_IN_MOVE_SIMILARITY_THRESHOLD:-}" ]; then cmd+=("-Dcodiqo.moveSimilarityThreshold=${CODIQO_IN_MOVE_SIMILARITY_THRESHOLD}"); fi
