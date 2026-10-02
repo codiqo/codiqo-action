@@ -261,6 +261,10 @@ inputs:
     description: 'Minimum token count for a copy-paste clone to be reported.'
     required: false
     default: ''
+  cpd-ignore-identifiers:
+    description: 'Let copy-paste detection match code whose identifiers were renamed. Set to false to report only clones that keep their names.'
+    required: false
+    default: ''
   diff-context-lines:
     description: 'Context lines included around each hunk in the diffs sent for scoring.'
     required: false
@@ -552,6 +556,7 @@ runs:
         CODIQO_IN_SPOTBUGS_PRIORITY_THRESHOLD: ${{ inputs.spotbugs-priority-threshold }}
         CODIQO_IN_SPOTBUGS_OMIT_VISITORS: ${{ inputs.spotbugs-omit-visitors }}
         CODIQO_IN_CPD_MINIMUM_TILE_SIZE: ${{ inputs.cpd-minimum-tile-size }}
+        CODIQO_IN_CPD_IGNORE_IDENTIFIERS: ${{ inputs.cpd-ignore-identifiers }}
         CODIQO_IN_DIFF_CONTEXT_LINES: ${{ inputs.diff-context-lines }}
         CODIQO_IN_BUILD_ERROR_CAPTURE_LIMIT: ${{ inputs.build-error-capture-limit }}
         CODIQO_IN_MOVE_DETECTION: ${{ inputs.move-detection }}

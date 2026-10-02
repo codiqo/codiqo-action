@@ -92,7 +92,7 @@ resolve today's snapshot dependencies rather than the ones current at the time. 
 also has no equivalent of the analysis-tuning inputs, so these are accepted and ignored under
 `build-tool: gradle`: `settings-xml`, `dump-analysis`, `move-detection`, `move-similarity-threshold`,
 `moved-line-coefficient`, `driver-score-cap-*`, `driver-factor-max-deviation`, `pmd-rules`,
-`pmd-min-priority`, `spotbugs-*`, `cpd-minimum-tile-size`, `diff-context-lines`,
+`pmd-min-priority`, `spotbugs-*`, `cpd-minimum-tile-size`, `cpd-ignore-identifiers`, `diff-context-lines`,
 `build-error-capture-limit`, `max-requests*`, `jdt-source-exclusions`, `index-batch-size`,
 `agent-instruction*` and `build-timeout-minutes`. Scores are therefore not comparable across the two
 build tools when you have tuned any of them.
@@ -217,6 +217,7 @@ analysis cost against detail; none of them changes how effort is scored except w
 | `spotbugs-priority-threshold` | `''` | Lowest SpotBugs priority to collect, as an integer (`1` = high). |
 | `spotbugs-omit-visitors` | `''` | Comma-separated SpotBugs detectors to skip, for detectors that are slow or noisy on your codebase. |
 | `cpd-minimum-tile-size` | `''` | Minimum token count for a copy-paste clone to be reported. |
+| `cpd-ignore-identifiers` | `''` | Let copy-paste detection match code whose identifiers were renamed (the engine default). `false` reports only clones that keep their names. |
 | `diff-context-lines` | `''` | Context lines included around each hunk in the diffs sent for scoring. |
 | `build-error-capture-limit` | `''` | Maximum characters of build output captured into a build-failure report. |
 | `jdt-use-shared-index` | `true` | Reuse the shared language-server index across runs. Much faster; turn off to force a clean index. |
