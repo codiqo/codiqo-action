@@ -212,7 +212,13 @@ else
     fi
     label="maven command    "
 fi
-if ! command -v "$build_command" > /dev/null 2>&1 && [ ! -x "$build_command" ]; then
+#
+# A plain mvn is installed by a later step when maven-version is set, so a runner without Maven
+# of its own is not an error yet.
+#
+if [ "$build_command" = "mvn" ] && [ -n "${CODIQO_IN_MAVEN_VERSION:-}" ]; then
+    codiqo::log "using Maven ${CODIQO_IN_MAVEN_VERSION}, installed by a later step."
+elif ! command -v "$build_command" > /dev/null 2>&1 && [ ! -x "$build_command" ]; then
     codiqo::die "$label '$build_command' was not found on PATH and is not an executable file."
 fi
 

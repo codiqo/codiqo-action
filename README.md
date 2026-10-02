@@ -127,7 +127,8 @@ reach it either. It defaults to 8g, which is worth lowering on a standard runner
 | `gradle-project-properties` | `''` | Newline-separated `key=value`, passed as `-Pkey=value`. The counterpart of `maven-user-properties`. Gradle only. |
 | `gradle-args` | `''` | Extra Gradle arguments, one per line. The counterpart of `maven-args`, which is never passed to Gradle. Gradle only. |
 | `analysis-max-heap` | `''` (plugin default `8g`) | Heap for the forked analysis JVM. The project's `org.gradle.jvmargs` does not size it. Gradle only. |
-| `maven-command` | `auto` | `auto` prefers `./mvnw`, else `mvn`. This action does not install Maven. |
+| `maven-command` | `auto` | `auto` prefers `./mvnw`, else `mvn`. |
+| `maven-version` | `3.10.0` | Apache Maven installed from Maven Central (SHA-512 checked) and put first on PATH, so every run builds with the same Maven. The forked build inherits it unless `maven-home` is set. A project's `./mvnw` still wins under `maven-command: auto`. `''` uses the runner's Maven. Maven only. |
 | `maven-home` | `''` | Maven home for the forked build. |
 | `jdtls-version` | `''` | Language server version override. |
 | `jdtls-use-snapshot` | `false` | Resolve the language server from Eclipse's snapshot channel; `jdtls-version` is then ignored. |

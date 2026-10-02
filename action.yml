@@ -61,9 +61,13 @@ inputs:
     required: false
     default: ''
   maven-command:
-    description: 'Maven executable. "auto" prefers the project''s ./mvnw when present and executable, otherwise mvn. Give an explicit path to override. This action deliberately does not install Maven, so pin a version with your own step if you need one.'
+    description: 'Maven executable. "auto" prefers the project''s ./mvnw when present and executable, otherwise mvn — the Maven that maven-version installs, or the runner''s own when that is empty. Give an explicit path to override.'
     required: false
     default: 'auto'
+  maven-version:
+    description: 'Apache Maven release to install from Maven Central and put first on PATH, so a commit is built by the same Maven on every run rather than whatever the runner image ships. The forked per-commit build inherits it unless maven-home names another. A project''s ./mvnw still takes precedence under maven-command: auto. Set to an empty string to use the Maven already on PATH. Maven only.'
+    required: false
+    default: '3.10.0'
   maven-home:
     description: 'Maven home for the forked per-commit build (-Dcodiqo.mavenHome).'
     required: false
@@ -409,6 +413,7 @@ runs:
         CODIQO_IN_GRADLE_PROJECT_PROPERTIES: ${{ inputs.gradle-project-properties }}
         CODIQO_IN_GRADLE_ARGS: ${{ inputs.gradle-args }}
         CODIQO_IN_MAVEN_COMMAND: ${{ inputs.maven-command }}
+        CODIQO_IN_MAVEN_VERSION: ${{ inputs.build-tool != 'gradle' && inputs.maven-version || '' }}
         CODIQO_IN_MAVEN_ARGS: ${{ inputs.maven-args }}
         CODIQO_IN_MAVEN_USER_PROPERTIES: ${{ inputs.maven-user-properties }}
         CODIQO_IN_MAVEN_OPTS: ${{ inputs.maven-opts }}
@@ -428,6 +433,17 @@ runs:
         # Gradle-only repository fails the whole job here, two steps in, rather than degrading.
         #
         cache: ${{ inputs.cache == 'auto' && (inputs.build-tool == 'gradle' && 'gradle' || 'maven') || inputs.cache }}
+
+    #
+    # After resolve-config, which has already chosen between ./mvnw and mvn, and before the first
+    # step that runs Maven.
+    #
+    - name: Set up Maven ${{ inputs.maven-version }}
+      if: inputs.build-tool != 'gradle' && inputs.maven-version != ''
+      shell: bash
+      run: "$GITHUB_ACTION_PATH/scripts/setup-maven.sh"
+      env:
+        CODIQO_IN_MAVEN_VERSION: ${{ inputs.maven-version }}
 
     #
     # The language server archive is fetched once and reused, so caching it removes a download
