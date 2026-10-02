@@ -239,7 +239,12 @@ for commit in "${commits[@]}"; do
         continue
     fi
 
-    cmd=("$CODIQO_BUILD_CMD" -B -ntp -e -U)
+    #
+    # -N for the same reason as in index-commits.sh: the goal clones the commit and builds its POMs
+    # itself, so the tip's modules are never needed, and an invalid one would fail every commit
+    # before the goal starts. The tip commit's own breakage is then excluded like any other commit's.
+    #
+    cmd=("$CODIQO_BUILD_CMD" -B -ntp -e -U -N)
     if [ -n "${CODIQO_IN_MAVEN_PARALLELISM:-}" ]; then cmd+=(-T "${CODIQO_IN_MAVEN_PARALLELISM}"); fi
     if [ -n "${CODIQO_TM_EXT_CLASSPATH:-}" ]; then cmd+=("-Dmaven.ext.class.path=${CODIQO_TM_EXT_CLASSPATH}"); fi
     cmd+=(${extra_args[@]+"${extra_args[@]}"})

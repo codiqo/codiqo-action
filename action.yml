@@ -188,7 +188,7 @@ inputs:
     required: false
     default: ''
   resolve-dependencies:
-    description: 'Run dependency:go-offline once before analysing, to warm the local repository and surface an unreachable repository as one clear failure. Off by default because go-offline is imperfect: it misses dependencies reachable only through a plugin, and some reactors make it fail outright.'
+    description: 'Run dependency:go-offline once before analysing, to warm the local repository and surface an unreachable repository as one clear warning; the run continues either way. Off by default because go-offline is imperfect: it misses dependencies reachable only through a plugin, and some reactors make it fail outright.'
     required: false
     default: 'false'
 

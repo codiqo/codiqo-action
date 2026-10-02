@@ -41,7 +41,13 @@ if [ "${CODIQO_BUILD_TOOL:-maven}" = "gradle" ]; then
 else
     plugin="io.codiqo:codiqo-maven-plugin:${CODIQO_IN_VERSION}"
 
-    cmd=("$CODIQO_BUILD_CMD" -B -ntp -e -U)
+    #
+    # -N because the goal needs only the root POM's identity, and Maven otherwise reads every
+    # module of the checked-out tip before any goal runs, whatever the goal declares. One invalid
+    # module POM at the tip (a duplicate dependency, say) then failed the whole job, so not even
+    # the healthy historical commits were indexed.
+    #
+    cmd=("$CODIQO_BUILD_CMD" -B -ntp -e -U -N)
     cmd+=(${extra_args[@]+"${extra_args[@]}"})
     cmd+=(${user_props[@]+"${user_props[@]}"})
     cmd+=("${plugin}:index-commits")

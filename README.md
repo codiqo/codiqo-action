@@ -181,7 +181,7 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 | `manage-plugin-repository` | `auto` | `auto` (snapshot versions only), `always`, `never`. |
 | `plugin-repository-url` | Central snapshots | Where the plugin and its extension are resolved from. |
 | `time-machine-repositories` | `''` | Extra `id=url` lines for resolving the extension privately. |
-| `resolve-dependencies` | `false` | Run `dependency:go-offline` once up front to warm the local repository. Off by default: `go-offline` misses plugin-only dependencies and fails on some reactors. |
+| `resolve-dependencies` | `false` | Run `dependency:go-offline` once up front to warm the local repository. Off by default: `go-offline` misses plugin-only dependencies and fails on some reactors. A failure is reported as a warning and the run continues. |
 
 ### Behaviour
 

@@ -5,7 +5,7 @@
 # Optional, and off by default, because dependency:go-offline is famously imperfect — it misses
 # dependencies only reachable through a plugin, and some reactors make it fail outright. Where it
 # does work it earns its keep twice over: the per-commit builds stop competing for the same
-# downloads, and a broken or unreachable repository surfaces here in one clear step rather than as a
+# downloads, and a broken or unreachable repository surfaces here as one clear warning rather than as a
 # confusing build failure inside the first commit.
 #
 set -euo pipefail
@@ -28,11 +28,13 @@ codiqo::emit_log_warnings "$CODIQO_LOGS_DIR/maven-resolve-deps.log"
 # The BUILD SUCCESS assertion matters here specifically: go-offline can exit 0 having quietly
 # skipped artifacts it could not resolve.
 #
-if ! reason=$(codiqo::assert_build_success "$CODIQO_LOGS_DIR/maven-resolve-deps.log" "$rc"); then
-    codiqo::error "dependency:go-offline $reason."
-    codiqo::log "if this project cannot be resolved offline, set resolve-dependencies: false — the per-commit builds resolve what they need anyway."
+# A failure is a warning, not the end of the job: it reflects the tip alone, and an invalid POM
+# there would otherwise block every historical commit. The per-commit builds resolve what they need
+# anyway, and a commit that cannot be resolved is excluded on its own.
+#
+if reason=$(codiqo::assert_build_success "$CODIQO_LOGS_DIR/maven-resolve-deps.log" "$rc"); then
+    codiqo::log "local repository warmed in ${CODIQO_LAST_ELAPSED}s."
+else
+    codiqo::warn "dependency:go-offline $reason; continuing without a warmed local repository."
     codiqo::tail_log "$CODIQO_LOGS_DIR/maven-resolve-deps.log"
-    exit 1
 fi
-
-codiqo::log "local repository warmed in ${CODIQO_LAST_ELAPSED}s."
