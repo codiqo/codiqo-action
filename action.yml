@@ -241,6 +241,10 @@ inputs:
     description: 'Skip copy-paste detection. Duplication then scores neutral rather than clean — no copy-paste-free bonus is awarded, since nothing was measured.'
     required: false
     default: 'false'
+  hotspots:
+    description: 'Rank the most important classes and the hotspots of the commit the run started on, with what can be done about each (uncovered methods, clones, static-analysis findings, complex methods), and submit them for the Codiqo project view and MCP tools. Costs seconds: it reuses the analysis of that commit. Runs only on pushes to the default branch, which owns the project''s one snapshot.'
+    required: false
+    default: 'true'
   ignore-diagnostics:
     description: 'Skip PMD and SpotBugs collection. Static analysis then scores neutral rather than clean — no clean-code bonus is awarded, since nothing was measured.'
     required: false
@@ -554,6 +558,8 @@ runs:
         CODIQO_IN_FAIL_ON_JDTLS_ERROR: ${{ inputs.fail-on-jdtls-error }}
         CODIQO_IN_IGNORE_COMPLEXITY: ${{ inputs.ignore-complexity }}
         CODIQO_IN_IGNORE_CPD: ${{ inputs.ignore-cpd }}
+        CODIQO_IN_HOTSPOTS: ${{ inputs.hotspots }}
+        CODIQO_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         CODIQO_IN_IGNORE_DIAGNOSTICS: ${{ inputs.ignore-diagnostics }}
         CODIQO_IN_PMD_RULES: ${{ inputs.pmd-rules }}
         CODIQO_IN_PMD_MIN_PRIORITY: ${{ inputs.pmd-min-priority }}

@@ -38,6 +38,28 @@ codiqo::read_lines_into extra_args "$CODIQO_WORK_DIR/build-args"
 codiqo::read_lines_into user_props "$CODIQO_WORK_DIR/build-props"
 
 #
+# The hotspot snapshot is built for the commit the run started on. It is captured here, before the
+# Gradle loop below checks out each analysed commit and moves HEAD away from it.
+#
+hotspots_commit=$(git rev-parse HEAD)
+
+# Only the default branch writes the project's snapshot, so unmerged code never replaces it.
+hotspots="${CODIQO_IN_HOTSPOTS:-true}"
+if [ "$hotspots" = "true" ]; then
+    case "${GITHUB_EVENT_NAME:-}" in
+        pull_request | pull_request_target) hotspots=false ;;
+        *)
+            if [ -n "${CODIQO_DEFAULT_BRANCH:-}" ] && [ "${GITHUB_REF:-}" != "refs/heads/${CODIQO_DEFAULT_BRANCH}" ]; then
+                hotspots=false
+            fi
+            ;;
+    esac
+    if [ "$hotspots" = "false" ]; then
+        codiqo::log "hotspots skipped: the snapshot is built only on the default branch (${CODIQO_DEFAULT_BRANCH:-unknown}), not on ${GITHUB_REF:-this ref}."
+    fi
+fi
+
+#
 # Who checks out the commit differs by build tool, and it is not a style choice. The Maven goal
 # clones the repository itself and builds the commit in a temporary tree, so the workspace is
 # never touched. A Gradle build reads its whole model at startup, so it cannot re-target itself at
@@ -183,6 +205,8 @@ for commit in "${commits[@]}"; do
         cmd+=("-Pcodiqo.ignoreCoverage=${CODIQO_IN_IGNORE_COVERAGE:-false}")
         cmd+=("-Pcodiqo.ignoreComplexity=${CODIQO_IN_IGNORE_COMPLEXITY:-false}")
         cmd+=("-Pcodiqo.ignoreCpd=${CODIQO_IN_IGNORE_CPD:-false}")
+        cmd+=("-Pcodiqo.hotspots=${hotspots}")
+        cmd+=("-Pcodiqo.hotspotsCommitId=${hotspots_commit}")
         cmd+=("-Pcodiqo.ignoreDiagnostics=${CODIQO_IN_IGNORE_DIAGNOSTICS:-false}")
         cmd+=("-Pcodiqo.skipOnBuildFailure=${CODIQO_IN_SKIP_ON_BUILD_FAILURE:-true}")
         cmd+=("-Pcodiqo.scoreOnBuildFailure=${CODIQO_IN_SCORE_ON_BUILD_FAILURE:-false}")
@@ -264,6 +288,8 @@ for commit in "${commits[@]}"; do
     cmd+=("-Dcodiqo.failOnJdtlsError=${CODIQO_IN_FAIL_ON_JDTLS_ERROR:-false}")
     cmd+=("-Dcodiqo.ignoreComplexity=${CODIQO_IN_IGNORE_COMPLEXITY:-false}")
     cmd+=("-Dcodiqo.ignoreCpd=${CODIQO_IN_IGNORE_CPD:-false}")
+    cmd+=("-Dcodiqo.hotspots=${hotspots}")
+    cmd+=("-Dcodiqo.hotspotsCommitId=${hotspots_commit}")
     cmd+=("-Dcodiqo.ignoreDiagnostics=${CODIQO_IN_IGNORE_DIAGNOSTICS:-false}")
     cmd+=("-Dcodiqo.moveDetectionEnabled=${CODIQO_IN_MOVE_DETECTION:-true}")
     cmd+=("-Dcodiqo.driverScoreCapDryRun=${CODIQO_IN_DRIVER_SCORE_CAP_DRY_RUN:-false}")

@@ -211,6 +211,7 @@ analysis cost against detail; none of them changes how effort is scored except w
 | Input | Default | Description |
 | --- | --- | --- |
 | `ignore-complexity` | `false` | Skip complexity metric collection. |
+| `hotspots` | `true` | Rank the most important classes and the hotspots of the commit the run started on, with what can be done about each, for the Codiqo project view and MCP tools. Costs seconds: it reuses that commit's analysis. Runs only on pushes to the default branch, which owns the project's one snapshot. |
 | `ignore-cpd` | `false` | Skip copy-paste detection. Duplication then scores neutral rather than clean — no copy-paste-free bonus, since nothing was measured. |
 | `ignore-diagnostics` | `false` | Skip PMD and SpotBugs collection. Static analysis then scores neutral rather than clean, on the same reasoning. |
 | `pmd-rules` | `''` | Comma-separated PMD ruleset resources. **Replaces** the default set rather than adding to it. The default codestyle entry is codiqo's own `codiqo/pmd/java-codestyle.xml`, which allows underscore-named test methods; substituting `category/java/codestyle.xml` makes every such test an ERROR-severity finding and costs quality score. |
