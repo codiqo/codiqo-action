@@ -3,6 +3,8 @@
 # Write a short run summary to the job summary page, so the outcome is visible without
 # downloading the log artifact.
 #
+# The backticks in the printf formats below are Markdown code spans, not command substitutions.
+# shellcheck disable=SC2016
 set -euo pipefail
 # shellcheck source=scripts/lib.sh
 . "$GITHUB_ACTION_PATH/scripts/lib.sh"
