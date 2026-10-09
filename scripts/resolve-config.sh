@@ -182,6 +182,38 @@ case "$build_tool" in
     *) codiqo::die "build-tool must be 'maven' or 'gradle', not '$build_tool'." ;;
 esac
 
+# ------------------------------------------------------------------------------ local review
+
+#
+# The review is a Maven-plugin feature: the Gradle plugin reads no review properties, so passing
+# them would be silently inert. Say so once, here, and leave the flags off.
+#
+review="${CODIQO_IN_REVIEW:-false}"
+case "$review" in
+    true | false) ;;
+    *) codiqo::die "review must be 'true' or 'false', not '$review'." ;;
+esac
+if [ "$review" = "true" ] && [ "$build_tool" = "gradle" ]; then
+    codiqo::warn "review: true is ignored under build-tool: gradle; the Gradle plugin has no local review. Commits are analysed without it."
+    review=false
+fi
+
+review_timeout_minutes=""
+if [ "$review" = "true" ] && [ -n "${CODIQO_IN_REVIEW_TIMEOUT_MINUTES:-}" ]; then
+    codiqo::_require_minutes "${CODIQO_IN_REVIEW_TIMEOUT_MINUTES}" "review-timeout-minutes"
+    review_timeout_minutes="$CODIQO_MINUTES"
+fi
+#
+# The review runs beside the build and is awaited before scoring, so it lives inside the per-commit
+# deadline too. 30 is the plugin's own default when the property is absent.
+#
+if [ "$review" = "true" ] && [ "${review_timeout_minutes:-30}" -ge "$per_commit_minutes" ]; then
+    codiqo::warn "the ${review_timeout_minutes:-30}m review timeout does not fit inside the ${per_commit_minutes}m per-commit deadline; a slow review kills the whole analysis instead of timing out on its own. Lower review-timeout-minutes or raise per-commit-timeout."
+fi
+if [ "$review" = "true" ] && [ "${CODIQO_IN_REVIEW_TRIAGE:-false}" = "true" ] && [ "${CODIQO_IN_REVIEW_ASSESS:-false}" != "true" ]; then
+    codiqo::log "review-triage without review-assess: confirmed defects join the review's bugs, but no finding is placed in the static-analysis review."
+fi
+
 # ----------------------------------------------------------------------------- build command
 
 if [ "$build_tool" = "gradle" ]; then
@@ -313,6 +345,8 @@ codiqo::export CODIQO_TEST_TIMEOUT_MINUTES "$test_timeout_minutes"
 codiqo::export CODIQO_PER_TEST_TIMEOUT_MINUTES "$per_test_minutes"
 codiqo::export CODIQO_BRANCH "$branch"
 codiqo::export CODIQO_BUILD_TOOL "$build_tool"
+codiqo::export CODIQO_REVIEW "$review"
+codiqo::export CODIQO_REVIEW_TIMEOUT_MINUTES "$review_timeout_minutes"
 #
 # `-` rather than `:-`: the composite action always sets this variable, so an empty value is the
 # documented way to analyse without running tests. `:-` would substitute on empty too and quietly
@@ -349,6 +383,7 @@ codiqo::log "per-commit limit : ${per_commit_minutes}m"
 codiqo::log "build limit      : ${build_timeout_minutes}m"
 codiqo::log "test limit       : ${test_timeout_minutes}m"
 codiqo::log "per-test limit   : ${per_test_minutes}m (0 = disabled)"
+codiqo::log "local review     : $review"
 codiqo::log "extra args       : $(wc -l < "$args_file" | tr -d ' ') line(s)"
 codiqo::log "user properties  : $(wc -l < "$props_file" | tr -d ' ') line(s)"
 codiqo::endgroup

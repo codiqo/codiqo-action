@@ -94,7 +94,8 @@ also has no equivalent of the analysis-tuning inputs, so these are accepted and 
 `moved-line-coefficient`, `driver-score-cap-*`, `driver-factor-max-deviation`, `pmd-rules`,
 `pmd-min-priority`, `spotbugs-*`, `cpd-minimum-tile-size`, `cpd-ignore-identifiers`, `diff-context-lines`,
 `build-error-capture-limit`, `max-requests*`, `jdt-source-exclusions`, `index-batch-size`,
-`agent-instruction*` and `build-timeout-minutes`. Scores are therefore not comparable across the two
+`agent-instruction*`, `build-timeout-minutes` and the local review (`review` is ignored with a warning,
+and `review-*` and `opencode-version` with it). Scores are therefore not comparable across the two
 build tools when you have tuned any of them.
 
 Gradle-specific inputs: `gradle-command`, `gradle-tasks`, `gradle-project-properties` (the
@@ -102,6 +103,53 @@ counterpart of `maven-user-properties`), `gradle-args` (the counterpart of `mave
 never passed to Gradle) and `analysis-max-heap`. The last one matters: the analysis runs in its own
 JVM, so the project's `org.gradle.jvmargs` does not size it, and an `-Xmx` in `maven-opts` does not
 reach it either. It defaults to 8g, which is worth lowering on a standard runner.
+
+## Local review
+
+Set `review: true` and the plugin also runs its local agent review beside the analysis: an
+[OpenCode](https://opencode.ai) session reads the commit and the code around it, and its bugs (and,
+with `review-assess`, its assessment of the commit) are attached to the submission. Maven only.
+
+```yaml
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# ... checkout with fetch-depth: 0, as in the quick start ...
+
+      - uses: codiqo/codiqo-action@main
+        with:
+          api-key: ${{ secrets.CODIQO_API_KEY }}
+          review: true
+          review-assess: true
+          review-triage: true
+```
+
+- **It spends your organization's LLM budget.** The review's model calls go through the Codiqo LLM
+  proxy (`https://mcp.codiqo.io/v1`), authenticated with the same `api-key`; no other secret is
+  needed. Every call is recorded against the organization.
+- **Only the checked-out HEAD is reviewed.** The review's agents read surrounding files from the
+  working tree, so the goal reviews a commit only when it is the workspace's clean HEAD. A run that
+  backfills many historical commits passes the flags to each of them, but reviews just the tip
+  commit `actions/checkout` left at HEAD (on a `pull_request` event, the merge commit it creates);
+  every other commit logs `local review skipped` and costs nothing extra. When the tip is already
+  analysed, nothing is reviewed. An earlier step that leaves modified or untracked (not ignored)
+  files in the workspace makes the tip ineligible too.
+- **It takes time.** A review can take several minutes, and up to `review-timeout-minutes` (30 by
+  default). It runs beside the build but is awaited before scoring, so it must fit inside
+  `per-commit-timeout`. Enable it for `push` and `pull_request` runs, where the tip is the commit you
+  care about, rather than for the scheduled catch-up of the quick start, whose tip is usually
+  analysed already.
+- **Triage needs the assessment for placements.** `review-triage` asks the review which PMD and
+  SpotBugs findings on added lines are real defects. Confirmed defects join the review's bugs either
+  way; placing every verdict in the static-analysis review needs `review-assess` as well.
+- **OpenCode is installed by the action**, from npm as `@opencode/cli` at `opencode-version`
+  (default `2.0.20`, the version the engine is validated with), into the runner tool cache, and is
+  cached with `actions/cache` per runner OS, architecture and version. This needs `npm` on the
+  runner: GitHub-hosted images have it; on a self-hosted runner add `actions/setup-node` first.
+  The install is skipped when `review` is off or nothing is pending, and a failed install fails the
+  run with the reason.
 
 ## Inputs
 
@@ -202,6 +250,18 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 | `agent-instructions` | `true` | Attach the repository's agent instruction files (`AGENTS.md`, `CLAUDE.md`, and equivalents) to the scoring prompt as a triage hint. They cannot change any score. |
 | `agent-instruction-files` | `''` | Comma-separated extra instruction paths, relative to the repository root. A path may name a file or a directory of rule files. |
 | `agent-instructions-max-chars` | `''` | Ceiling on the assembled instruction text. Exceeding it fails the analysis rather than truncating. Empty uses the engine default (64 KiB). |
+
+### Local review
+
+Maven only; see [Local review](#local-review) for what it costs and which commit it reviews.
+
+| Input | Default | Description |
+| --- | --- | --- |
+| `review` | `false` | Run the plugin's local agent review beside the analysis (`-Dcodiqo.review`). Spends the organization's LLM budget through the Codiqo proxy, authenticated with `api-key`. |
+| `review-assess` | `false` | Also have the review assess the commit: code-unit difficulty, summary, tags, task types and quality dimensions (`-Dcodiqo.review.assess`). |
+| `review-triage` | `false` | Have the review judge which PMD and SpotBugs findings on added lines are real defects (`-Dcodiqo.review.triage`). Placing every verdict needs `review-assess`. |
+| `review-timeout-minutes` | `''` | Limit for one review (`-Dcodiqo.review.timeoutMinutes`). Empty uses the plugin default of 30. Keep it below `per-commit-timeout`. |
+| `opencode-version` | `2.0.20` | Version of the OpenCode CLI (`@opencode/cli` on npm) installed for the review. |
 
 ### Analysis depth
 
@@ -374,6 +434,7 @@ you want it.
 | `0 commits require analysis`, unexpectedly | Widen `commit-window`, check `exclude-author-emails`, confirm full history. |
 | **Plugin or `codiqo-maven-time-machine` will not resolve** | The version is not in your repositories. Check `codiqo-version`; note that a catch-all `<mirrorOf>` swallows the snapshot repository — exclude it with `<mirrorOf>external:*,!central-snapshots</mirrorOf>`. |
 | **Commit killed at the deadline** | Raise `per-commit-timeout`; `build-timeout-minutes` follows it automatically. Raising only the build timeout is clamped back, since it must stay inside the outer deadline. Exit 137 can also be a kernel OOM kill: lower `maven-parallelism` or use a larger runner. |
+| `local review skipped: ... is not the clean HEAD` | Expected for every commit but the tip. For the tip itself, an earlier step left modified or untracked files in the workspace. |
 | **Artifact name conflict** | Give each job a distinct `log-artifact-name`. |
 
 ## Versioning
