@@ -341,6 +341,26 @@ inputs:
     description: 'Ceiling on the assembled instruction text. Exceeding it fails the analysis rather than truncating, so the ceiling is raised deliberately: a trimmed rule set silently changes which findings the model suppresses. Leave empty for the engine default (64 KiB).'
     required: false
     default: ''
+  review:
+    description: 'Run the plugin''s local agent review (-Dcodiqo.review) beside the analysis, with an OpenCode CLI this action installs. It reviews only the commit that is the checked-out HEAD, authenticates to the Codiqo LLM proxy with api-key, and spends the organization''s LLM budget; expect several minutes per reviewed commit. Maven only: under build-tool: gradle it is ignored with a warning.'
+    required: false
+    default: 'false'
+  review-assess:
+    description: 'Also have the review assess the commit: code-unit difficulty, summary, tags, task types and quality dimensions (-Dcodiqo.review.assess). Only with review: true.'
+    required: false
+    default: 'false'
+  review-triage:
+    description: 'After the build, have the review judge which PMD and SpotBugs findings on added lines are real defects (-Dcodiqo.review.triage). Confirmed ones join the review''s bugs; placing every verdict in the static-analysis review also needs review-assess. Only with review: true.'
+    required: false
+    default: 'false'
+  review-timeout-minutes:
+    description: 'Limit for one review (-Dcodiqo.review.timeoutMinutes). Empty uses the plugin default of 30 minutes. Keep it below per-commit-timeout: the review runs inside that deadline. Only with review: true.'
+    required: false
+    default: ''
+  opencode-version:
+    description: 'Version of the OpenCode CLI (npm package @opencode/cli) installed for the review. Needs npm on the runner. Only installed with review: true and build-tool: maven.'
+    required: false
+    default: '2.0.20'
   stop-on-first-failure:
     description: 'Stop at the first commit that genuinely fails to analyse — a timeout, an out-of-memory kill, or a build failure of the analysis run itself. A commit codiqo excludes (unresolvable historical dependency, build failure of the analysed commit, no analyzable diff) is a normal outcome and never trips this. Turn it off to attempt every commit and fail the step at the end.'
     required: false
@@ -432,6 +452,10 @@ runs:
         CODIQO_IN_REQUIRE_FULL_HISTORY: ${{ inputs.require-full-history }}
         CODIQO_IN_HEARTBEAT_INTERVAL: ${{ inputs.heartbeat-interval-seconds }}
         CODIQO_IN_TAIL_LINES: ${{ inputs.maven-step-tail-lines }}
+        CODIQO_IN_REVIEW: ${{ inputs.review }}
+        CODIQO_IN_REVIEW_ASSESS: ${{ inputs.review-assess }}
+        CODIQO_IN_REVIEW_TRIAGE: ${{ inputs.review-triage }}
+        CODIQO_IN_REVIEW_TIMEOUT_MINUTES: ${{ inputs.review-timeout-minutes }}
 
     - name: Set up JDK ${{ inputs.java-version }}
       if: inputs.java-version != ''
@@ -534,6 +558,24 @@ runs:
         CODIQO_IN_PLUGIN_REPOSITORY_URL: ${{ inputs.plugin-repository-url }}
         CODIQO_IN_TIME_MACHINE_REPOSITORIES: ${{ inputs.time-machine-repositories }}
 
+    #
+    # The OpenCode binary is about 180 MB and immutable per version, so it is cached rather than
+    # fetched from npm on every run. Skipped, like the install, when nothing is pending.
+    #
+    - name: Cache the OpenCode CLI
+      if: inputs.review == 'true' && inputs.build-tool != 'gradle' && steps.index.outputs.missing-count != '0'
+      uses: actions/cache@v6
+      with:
+        path: ${{ runner.tool_cache }}/codiqo-opencode/${{ inputs.opencode-version }}
+        key: codiqo-opencode-${{ runner.os }}-${{ runner.arch }}-${{ inputs.opencode-version }}
+
+    - name: Set up OpenCode ${{ inputs.opencode-version }}
+      if: inputs.review == 'true' && inputs.build-tool != 'gradle' && steps.index.outputs.missing-count != '0'
+      shell: bash
+      run: "$GITHUB_ACTION_PATH/scripts/setup-opencode.sh"
+      env:
+        CODIQO_IN_OPENCODE_VERSION: ${{ inputs.opencode-version }}
+
     - name: Submit commit analyses
       id: submit
       if: steps.index.outputs.missing-count != '0'
@@ -585,6 +627,8 @@ runs:
         CODIQO_IN_AGENT_INSTRUCTIONS: ${{ inputs.agent-instructions }}
         CODIQO_IN_AGENT_INSTRUCTION_FILES: ${{ inputs.agent-instruction-files }}
         CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS: ${{ inputs.agent-instructions-max-chars }}
+        CODIQO_IN_REVIEW_ASSESS: ${{ inputs.review-assess }}
+        CODIQO_IN_REVIEW_TRIAGE: ${{ inputs.review-triage }}
         CODIQO_IN_STOP_ON_FIRST_FAILURE: ${{ inputs.stop-on-first-failure }}
         CODIQO_IN_LOG_COMMIT_AUTHORS: ${{ inputs.log-commit-authors }}
         CODIQO_IN_JAVA_HOME: ${{ inputs.java-home }}

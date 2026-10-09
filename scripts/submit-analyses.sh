@@ -332,6 +332,19 @@ for commit in "${commits[@]}"; do
     if [ -n "${CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS:-}" ]; then cmd+=("-Dcodiqo.llm.conventionFilesMaxChars=${CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS}"); fi
 
     #
+    # Passed for every commit, but the goal reviews only the commit that is the workspace's clean HEAD
+    # (the review's agents read the working tree), so a backlog spends review budget on the tip alone
+    # and logs "local review skipped" for the rest. The proxy is reached with the same API key.
+    #
+    if [ "${CODIQO_REVIEW:-false}" = "true" ]; then
+        cmd+=("-Dcodiqo.review=true")
+        cmd+=("-Dcodiqo.review.assess=${CODIQO_IN_REVIEW_ASSESS:-false}")
+        cmd+=("-Dcodiqo.review.triage=${CODIQO_IN_REVIEW_TRIAGE:-false}")
+        cmd+=("-Dcodiqo.review.executable=${CODIQO_OPENCODE_EXECUTABLE:?the OpenCode install step did not run}")
+        if [ -n "${CODIQO_REVIEW_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Dcodiqo.review.timeoutMinutes=${CODIQO_REVIEW_TIMEOUT_MINUTES}"); fi
+    fi
+
+    #
     # The forked build's event spy appends module progress here for the heartbeat to report.
     # It sits beside the commit's log so the upload keeps each module's duration as well.
     #
