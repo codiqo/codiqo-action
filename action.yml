@@ -342,7 +342,7 @@ inputs:
     required: false
     default: ''
   review:
-    description: 'Run the plugin''s local agent review (-Dcodiqo.review) beside the analysis, with an OpenCode CLI this action installs. It reviews only the commit that is the checked-out HEAD, authenticates to the Codiqo LLM proxy with api-key, and spends the organization''s LLM budget; expect several minutes per reviewed commit. Maven only: under build-tool: gradle it is ignored with a warning.'
+    description: 'Run the plugin''s local agent review (-Dcodiqo.review) beside the analysis, with an OpenCode CLI this action installs. It reviews every analysed commit in that commit''s own checkout, authenticates to the Codiqo LLM proxy with api-key, and spends the organization''s LLM budget; expect several minutes per reviewed commit. Maven only: under build-tool: gradle it is ignored with a warning.'
     required: false
     default: 'false'
   review-assess:

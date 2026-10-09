@@ -129,13 +129,10 @@ on:
 - **It spends your organization's LLM budget.** The review's model calls go through the Codiqo LLM
   proxy (`https://mcp.codiqo.io/v1`), authenticated with the same `api-key`; no other secret is
   needed. Every call is recorded against the organization.
-- **Only the checked-out HEAD is reviewed.** The review's agents read surrounding files from the
-  working tree, so the goal reviews a commit only when it is the workspace's clean HEAD. A run that
-  backfills many historical commits passes the flags to each of them, but reviews just the tip
-  commit `actions/checkout` left at HEAD (on a `pull_request` event, the merge commit it creates);
-  every other commit logs `local review skipped` and costs nothing extra. When the tip is already
-  analysed, nothing is reviewed. An earlier step that leaves modified or untracked (not ignored)
-  files in the workspace makes the tip ineligible too.
+- **Every analysed commit is reviewed.** The review's agents read the commit's own checkout, the
+  temporary clone the analysis builds it in, so a run that backfills many historical commits reviews
+  each of them: one paid review per commit. A commit that changes no file the analysis reads (only
+  a workflow file, say) logs `local review skipped` and costs nothing.
 - **It takes time.** A review can take several minutes, and up to `review-timeout-minutes` (30 by
   default). It runs beside the build but is awaited before scoring, so it must fit inside
   `per-commit-timeout`. Enable it for `push` and `pull_request` runs, where the tip is the commit you
@@ -434,7 +431,7 @@ you want it.
 | `0 commits require analysis`, unexpectedly | Widen `commit-window`, check `exclude-author-emails`, confirm full history. |
 | **Plugin or `codiqo-maven-time-machine` will not resolve** | The version is not in your repositories. Check `codiqo-version`; note that a catch-all `<mirrorOf>` swallows the snapshot repository — exclude it with `<mirrorOf>external:*,!central-snapshots</mirrorOf>`. |
 | **Commit killed at the deadline** | Raise `per-commit-timeout`; `build-timeout-minutes` follows it automatically. Raising only the build timeout is clamped back, since it must stay inside the outer deadline. Exit 137 can also be a kernel OOM kill: lower `maven-parallelism` or use a larger runner. |
-| `local review skipped: ... is not the clean HEAD` | Expected for every commit but the tip. For the tip itself, an earlier step left modified or untracked files in the workspace. |
+| `local review skipped: ... changes no file the analysis reads` | Expected: the commit is excluded as having nothing to analyse, so no review is paid for. |
 | **Artifact name conflict** | Give each job a distinct `log-artifact-name`. |
 
 ## Versioning
