@@ -210,6 +210,8 @@ jobs:
       - name: settings.xml merge is idempotent and preserves the caller's profiles
         run: |
           set -euo pipefail
+          # the assertions below query the merged file with xmllint, which ubuntu-latest does not ship
+          command -v xmllint > /dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq libxml2-utils; }
           work="$(mktemp -d)"
           cat > "$work/settings.xml" <<'XML'
           <settings>

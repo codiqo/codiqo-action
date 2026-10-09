@@ -288,7 +288,10 @@ codiqo::run_step() {
     fi
     codiqo::heartbeat_wait $! "$name" "$log" "$start" || rc=$?
 
+    # read by the scripts that source this library, which shellcheck does not follow back
+    # shellcheck disable=SC2034
     CODIQO_LAST_LOG="$log"
+    # shellcheck disable=SC2034
     CODIQO_LAST_ELAPSED=$(($(date +%s) - start))
     return "$rc"
 }
