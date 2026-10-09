@@ -73,7 +73,7 @@ jobs:
           # every CODIQO_IN_* the scripts read must be set somewhere in action.yml
           set_here = set(re.findall(r"^\s+(CODIQO_[A-Z0-9_]+):", body, re.M))
           read = set()
-          for p in pathlib.Path("scripts").iterdir():
+          for p in (f for f in pathlib.Path("scripts").iterdir() if f.is_file()):  # the python syntax step leaves __pycache__
               t = p.read_text()
               read |= set(re.findall(r"\$\{(CODIQO_IN_[A-Z0-9_]+)", t))
           if read - set_here:
