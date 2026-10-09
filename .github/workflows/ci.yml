@@ -116,13 +116,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        # resolve-config.sh refuses a shallow clone, which is what a bare checkout is
+        with:
+          fetch-depth: 0
 
       # The shorthand mappings are the action's compatibility contract: callers pass '3m' and
       # '1h' from dropdowns, and ISO-8601 parsing of '3m' would throw at the plugin.
       - name: shorthand mapping
         run: |
           set -euo pipefail
-          export GITHUB_ACTION_PATH="$PWD" RUNNER_TEMP="$(mktemp -d)"
+          RUNNER_TEMP="$(mktemp -d)"
+          export GITHUB_ACTION_PATH="$PWD" RUNNER_TEMP
           # Captured into a variable rather than piped: `... | grep -q` makes grep exit on the
           # first match, the producer takes SIGPIPE, and under pipefail the pipeline reports 141
           # even though the assertion passed.
@@ -169,7 +173,8 @@ jobs:
       - name: timeout nesting is derived and clamped
         run: |
           set -euo pipefail
-          export GITHUB_ACTION_PATH="$PWD" RUNNER_TEMP="$(mktemp -d)"
+          RUNNER_TEMP="$(mktemp -d)"
+          export GITHUB_ACTION_PATH="$PWD" RUNNER_TEMP
           fit() {
             CODIQO_IN_VERSION=1.0-SNAPSHOT CODIQO_IN_COMMIT_WINDOW=3m \
             CODIQO_IN_PER_COMMIT_TIMEOUT="$1" CODIQO_IN_PER_TEST_TIMEOUT=15m \
