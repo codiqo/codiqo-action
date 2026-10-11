@@ -341,6 +341,9 @@ for commit in "${commits[@]}"; do
         cmd+=("-Dcodiqo.review.assess=${CODIQO_IN_REVIEW_ASSESS:-false}")
         cmd+=("-Dcodiqo.review.triage=${CODIQO_IN_REVIEW_TRIAGE:-false}")
         cmd+=("-Dcodiqo.review.executable=${CODIQO_OPENCODE_EXECUTABLE:?the OpenCode install step did not run}")
+        # Each review's trace (every agent session and tool call) lands beside the logs, so it is
+        # redacted and uploaded with them.
+        cmd+=("-Dcodiqo.review.traceDirectory=$CODIQO_LOGS_DIR/review-trace")
         if [ -n "${CODIQO_REVIEW_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Dcodiqo.review.timeoutMinutes=${CODIQO_REVIEW_TIMEOUT_MINUTES}"); fi
     fi
 
