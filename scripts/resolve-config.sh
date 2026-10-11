@@ -210,9 +210,6 @@ fi
 if [ "$review" = "true" ] && [ "${review_timeout_minutes:-30}" -ge "$per_commit_minutes" ]; then
     codiqo::warn "the ${review_timeout_minutes:-30}m review timeout does not fit inside the ${per_commit_minutes}m per-commit deadline; a slow review kills the whole analysis instead of timing out on its own. Lower review-timeout-minutes or raise per-commit-timeout."
 fi
-if [ "$review" = "true" ] && [ "${CODIQO_IN_REVIEW_TRIAGE:-false}" = "true" ] && [ "${CODIQO_IN_REVIEW_ASSESS:-false}" != "true" ]; then
-    codiqo::log "review-triage without review-assess: confirmed defects join the review's bugs, but no finding is placed in the static-analysis review."
-fi
 
 # ----------------------------------------------------------------------------- build command
 

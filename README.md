@@ -106,9 +106,10 @@ reach it either. It defaults to 8g, which is worth lowering on a standard runner
 
 ## Local review
 
-Set `review: true` and the plugin also runs its local agent review beside the analysis: an
-[OpenCode](https://opencode.ai) session reads the commit and the code around it, and its bugs (and,
-with `review-assess`, its assessment of the commit) are attached to the submission. Maven only.
+Set `review: true` for local mode: the plugin runs its local agent review beside the analysis, an
+[OpenCode](https://opencode.ai) session reads the commit and the code around it, reviews and assesses
+it and judges its PMD and SpotBugs findings after the build, and the server scores the commit from
+that assessment alone. There are no other review switches. Maven only.
 
 ```yaml
 on:
@@ -122,8 +123,6 @@ on:
         with:
           api-key: ${{ secrets.CODIQO_API_KEY }}
           review: true
-          review-assess: true
-          review-triage: true
 ```
 
 - **It spends your organization's LLM budget.** The review's model calls go through the Codiqo LLM
@@ -138,9 +137,9 @@ on:
   `per-commit-timeout`. Enable it for `push` and `pull_request` runs, where the tip is the commit you
   care about, rather than for the scheduled catch-up of the quick start, whose tip is usually
   analysed already.
-- **Triage needs the assessment for placements.** `review-triage` asks the review which PMD and
-  SpotBugs findings on added lines are real defects. Confirmed defects join the review's bugs either
-  way; placing every verdict in the static-analysis review needs `review-assess` as well.
+- **A review that fails excludes the commit** (category `LOCAL_REVIEW_FAILURE`), so the server's
+  prompt never judges a commit of local mode and no later run pays for the review again. Deleting the
+  analysis retries it.
 - **OpenCode is installed by the action**, from npm as `@opencode/cli` at `opencode-version`
   (default `2.0.20`, the version the engine is validated with), into the runner tool cache, and is
   cached with `actions/cache` per runner OS, architecture and version. This needs `npm` on the
@@ -254,9 +253,7 @@ Maven only; see [Local review](#local-review) for what it costs and which commit
 
 | Input | Default | Description |
 | --- | --- | --- |
-| `review` | `false` | Run the plugin's local agent review beside the analysis (`-Dcodiqo.review`). Spends the organization's LLM budget through the Codiqo proxy, authenticated with `api-key`. |
-| `review-assess` | `false` | Also have the review assess the commit: code-unit difficulty, summary, tags, task types and quality dimensions (`-Dcodiqo.review.assess`). |
-| `review-triage` | `false` | Have the review judge which PMD and SpotBugs findings on added lines are real defects (`-Dcodiqo.review.triage`). Placing every verdict needs `review-assess`. |
+| `review` | `false` | Local mode (`-Dcodiqo.review`): review, assess and triage every analysed commit, scored from that assessment alone. Spends the organization's LLM budget through the Codiqo proxy, authenticated with `api-key`. |
 | `review-timeout-minutes` | `''` | Limit for one review (`-Dcodiqo.review.timeoutMinutes`). Empty uses the plugin default of 30. Keep it below `per-commit-timeout`. |
 | `opencode-version` | `2.0.20` | Version of the OpenCode CLI (`@opencode/cli` on npm) installed for the review. |
 

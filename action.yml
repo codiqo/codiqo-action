@@ -342,15 +342,7 @@ inputs:
     required: false
     default: ''
   review:
-    description: 'Run the plugin''s local agent review (-Dcodiqo.review) beside the analysis, with an OpenCode CLI this action installs. It reviews every analysed commit in that commit''s own checkout, authenticates to the Codiqo LLM proxy with api-key, and spends the organization''s LLM budget; expect several minutes per reviewed commit. Maven only: under build-tool: gradle it is ignored with a warning.'
-    required: false
-    default: 'false'
-  review-assess:
-    description: 'Also have the review assess the commit: code-unit difficulty, summary, tags, task types and quality dimensions (-Dcodiqo.review.assess). Only with review: true.'
-    required: false
-    default: 'false'
-  review-triage:
-    description: 'After the build, have the review judge which PMD and SpotBugs findings on added lines are real defects (-Dcodiqo.review.triage). Confirmed ones join the review''s bugs; placing every verdict in the static-analysis review also needs review-assess. Only with review: true.'
+    description: 'Local mode (-Dcodiqo.review): an OpenCode review, with a CLI this action installs, reviews and assesses every analysed commit in that commit''s own checkout, judges its PMD and SpotBugs findings after the build, and the server scores the commit from that assessment alone. A review that fails excludes the commit. It authenticates to the Codiqo LLM proxy with api-key and spends the organization''s LLM budget; expect several minutes per reviewed commit. Maven only: under build-tool: gradle it is ignored with a warning.'
     required: false
     default: 'false'
   review-timeout-minutes:
@@ -453,8 +445,6 @@ runs:
         CODIQO_IN_HEARTBEAT_INTERVAL: ${{ inputs.heartbeat-interval-seconds }}
         CODIQO_IN_TAIL_LINES: ${{ inputs.maven-step-tail-lines }}
         CODIQO_IN_REVIEW: ${{ inputs.review }}
-        CODIQO_IN_REVIEW_ASSESS: ${{ inputs.review-assess }}
-        CODIQO_IN_REVIEW_TRIAGE: ${{ inputs.review-triage }}
         CODIQO_IN_REVIEW_TIMEOUT_MINUTES: ${{ inputs.review-timeout-minutes }}
 
     - name: Set up JDK ${{ inputs.java-version }}
@@ -627,8 +617,6 @@ runs:
         CODIQO_IN_AGENT_INSTRUCTIONS: ${{ inputs.agent-instructions }}
         CODIQO_IN_AGENT_INSTRUCTION_FILES: ${{ inputs.agent-instruction-files }}
         CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS: ${{ inputs.agent-instructions-max-chars }}
-        CODIQO_IN_REVIEW_ASSESS: ${{ inputs.review-assess }}
-        CODIQO_IN_REVIEW_TRIAGE: ${{ inputs.review-triage }}
         CODIQO_IN_STOP_ON_FIRST_FAILURE: ${{ inputs.stop-on-first-failure }}
         CODIQO_IN_LOG_COMMIT_AUTHORS: ${{ inputs.log-commit-authors }}
         CODIQO_IN_JAVA_HOME: ${{ inputs.java-home }}
