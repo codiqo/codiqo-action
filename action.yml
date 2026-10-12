@@ -194,7 +194,7 @@ inputs:
 
   # ----------------------------------------------------------------------------------- behaviour
   score-on-build-failure:
-    description: 'Score a commit from its diff alone when its build fails, instead of excluding it. The result carries a capped quality multiplier.'
+    description: 'Score a commit from its diff alone when its build fails, instead of excluding it. The result carries a capped quality multiplier. With review on, a build the commit broke is always scored, from the local review''s assessment; an unresolvable dependency or a timeout stays excluded.'
     required: false
     default: 'false'
   exclude-reverted-commits:
