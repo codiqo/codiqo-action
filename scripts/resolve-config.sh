@@ -186,7 +186,8 @@ esac
 
 #
 # The review is a Maven-plugin feature: the Gradle plugin reads no review properties, so passing
-# them would be silently inert. Say so once, here, and leave the flags off.
+# them would be silently inert. It is on by default, so a Gradle run says so in the log, not as a
+# warning on every run, and leaves the flags off.
 #
 review="${CODIQO_IN_REVIEW:-false}"
 case "$review" in
@@ -194,7 +195,7 @@ case "$review" in
     *) codiqo::die "review must be 'true' or 'false', not '$review'." ;;
 esac
 if [ "$review" = "true" ] && [ "$build_tool" = "gradle" ]; then
-    codiqo::warn "review: true is ignored under build-tool: gradle; the Gradle plugin has no local review. Commits are analysed without it."
+    codiqo::log "local review skipped under build-tool: gradle; the Gradle plugin has no local review. Commits are analysed without it."
     review=false
 fi
 

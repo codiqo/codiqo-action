@@ -342,9 +342,9 @@ inputs:
     required: false
     default: ''
   review:
-    description: 'Local mode (-Dcodiqo.review): an OpenCode review, with a CLI this action installs, reviews and assesses every analysed commit in that commit''s own checkout, judges its PMD and SpotBugs findings after the build, and the server scores the commit from that assessment alone. A review that fails excludes the commit. It authenticates to the Codiqo LLM proxy with api-key and spends the organization''s LLM budget; expect several minutes per reviewed commit. Maven only: under build-tool: gradle it is ignored with a warning.'
+    description: 'Local mode (-Dcodiqo.review): an OpenCode review, with a CLI this action installs, reviews and assesses every analysed commit in that commit''s own checkout, judges its PMD and SpotBugs findings after the build, and the server scores the commit from that assessment alone. A review that fails excludes the commit. It authenticates to the Codiqo LLM proxy with api-key and spends the organization''s LLM budget; expect several minutes per reviewed commit. On by default; set it to false to have the server's prompt score commits instead. Maven only: under build-tool: gradle it is skipped.'
     required: false
-    default: 'false'
+    default: 'true'
   review-timeout-minutes:
     description: 'Limit for one review (-Dcodiqo.review.timeoutMinutes). Empty uses the plugin default of 30 minutes. Keep it below per-commit-timeout: the review runs inside that deadline. Only with review: true.'
     required: false

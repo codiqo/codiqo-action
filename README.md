@@ -94,8 +94,8 @@ also has no equivalent of the analysis-tuning inputs, so these are accepted and 
 `moved-line-coefficient`, `driver-score-cap-*`, `driver-factor-max-deviation`, `pmd-rules`,
 `pmd-min-priority`, `spotbugs-*`, `cpd-minimum-tile-size`, `cpd-ignore-identifiers`, `diff-context-lines`,
 `build-error-capture-limit`, `max-requests*`, `jdt-source-exclusions`, `index-batch-size`,
-`agent-instruction*`, `build-timeout-minutes` and the local review (`review` is ignored with a warning,
-and `review-*` and `opencode-version` with it). Scores are therefore not comparable across the two
+`agent-instruction*`, `build-timeout-minutes` and the local review (`review` is skipped, with a line in
+the log, and `review-*` and `opencode-version` with it). Scores are therefore not comparable across the two
 build tools when you have tuned any of them.
 
 Gradle-specific inputs: `gradle-command`, `gradle-tasks`, `gradle-project-properties` (the
@@ -106,10 +106,11 @@ reach it either. It defaults to 8g, which is worth lowering on a standard runner
 
 ## Local review
 
-Set `review: true` for local mode: the plugin runs its local agent review beside the analysis, an
-[OpenCode](https://opencode.ai) session reads the commit and the code around it, reviews and assesses
-it and judges its PMD and SpotBugs findings after the build, and the server scores the commit from
-that assessment alone. There are no other review switches. Maven only.
+Local mode is on by default (`review: true`): the plugin runs its local agent review beside the
+analysis, an [OpenCode](https://opencode.ai) session reads the commit and the code around it, reviews
+and assesses it and judges its PMD and SpotBugs findings after the build, and the server scores the
+commit from that assessment alone. Set `review: false` to have the server's prompt score commits
+instead. There are no other review switches. Maven only.
 
 ```yaml
 on:
@@ -122,7 +123,7 @@ on:
       - uses: codiqo/codiqo-action@main
         with:
           api-key: ${{ secrets.CODIQO_API_KEY }}
-          review: true
+          # review: false   # opt out of local mode; the server's prompt scores the commits
 ```
 
 - **It spends your organization's LLM budget.** The review's model calls go through the Codiqo LLM
@@ -134,9 +135,9 @@ on:
   a workflow file, say) logs `local review skipped` and costs nothing.
 - **It takes time.** A review can take several minutes, and up to `review-timeout-minutes` (30 by
   default). It runs beside the build but is awaited before scoring, so it must fit inside
-  `per-commit-timeout`. Enable it for `push` and `pull_request` runs, where the tip is the commit you
-  care about, rather than for the scheduled catch-up of the quick start, whose tip is usually
-  analysed already.
+  `per-commit-timeout`. Being on by default, it also reviews every commit a scheduled catch-up or a
+  first run with a long `commit-window` backfills; set `review: false` on such a workflow if that
+  backlog should be scored by the server's prompt instead.
 - **A review that fails excludes the commit** (category `LOCAL_REVIEW_FAILURE`), so the server's
   prompt never judges a commit of local mode and no later run pays for the review again. Deleting the
   analysis retries it.
@@ -253,7 +254,7 @@ Maven only; see [Local review](#local-review) for what it costs and which commit
 
 | Input | Default | Description |
 | --- | --- | --- |
-| `review` | `false` | Local mode (`-Dcodiqo.review`): review, assess and triage every analysed commit, scored from that assessment alone. Spends the organization's LLM budget through the Codiqo proxy, authenticated with `api-key`. |
+| `review` | `true` | Local mode (`-Dcodiqo.review`): review, assess and triage every analysed commit, scored from that assessment alone. Spends the organization's LLM budget through the Codiqo proxy, authenticated with `api-key`. |
 | `review-timeout-minutes` | `''` | Limit for one review (`-Dcodiqo.review.timeoutMinutes`). Empty uses the plugin default of 30. Keep it below `per-commit-timeout`. |
 | `opencode-version` | `2.0.25` | Version of the OpenCode CLI (`@opencode/cli` on npm) installed for the review. |
 
