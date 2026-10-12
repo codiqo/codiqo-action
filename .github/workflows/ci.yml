@@ -37,7 +37,12 @@ jobs:
       - name: python syntax
         run: python3 -m py_compile scripts/*.py
 
-      - name: action.yml parses and is internally consistent
+      # actionlint checks workflows only, never action.yml, and the step below reads action.yml as text: a quote
+      # that ended a string early passed both and broke every caller. Ruby's stdlib YAML parser is on the runner.
+      - name: action.yml is valid YAML
+        run: ruby -ryaml -e 'YAML.safe_load(File.read("action.yml")).fetch("inputs")'
+
+      - name: action.yml is internally consistent
         run: |
           set -euo pipefail
           python3 - <<'PY'
