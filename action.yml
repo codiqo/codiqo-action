@@ -67,7 +67,7 @@ inputs:
   maven-version:
     description: 'Apache Maven release to install from Maven Central and put first on PATH, so a commit is built by the same Maven on every run rather than whatever the runner image ships. The forked per-commit build inherits it unless maven-home names another. A project''s ./mvnw still takes precedence under maven-command: auto. Set to an empty string to use the Maven already on PATH. Maven only.'
     required: false
-    default: '3.10.0'
+    default: '3.9.16'
   maven-home:
     description: 'Maven home for the forked per-commit build (-Dcodiqo.mavenHome).'
     required: false
