@@ -120,11 +120,6 @@ inputs:
     description: 'Wall-clock limit for analysing one commit before it is killed, enforced from outside the JVM. This is the outer deadline the build and test budgets are fitted under, so raising or lowering it moves them with it.'
     required: false
     default: '1h'
-  per-commit-timeout-minutes:
-    description: 'Deprecated: use per-commit-timeout, which also accepts plain minutes.'
-    required: false
-    default: ''
-    deprecationMessage: 'per-commit-timeout-minutes is deprecated; use per-commit-timeout.'
   build-timeout-minutes:
     description: 'Limit for the forked build of a single commit (-Dcodiqo.buildTimeoutMinutes). It has to fire before per-commit-timeout, or the outer deadline kills the analysis before codiqo can record the commit as a build failure. Left empty it is three quarters of per-commit-timeout; a value that would not fit is clamped back to that, with a warning.'
     required: false
@@ -423,7 +418,6 @@ runs:
         CODIQO_IN_BRANCH: ${{ inputs.branch }}
         CODIQO_IN_COMMIT_WINDOW: ${{ inputs.commit-window }}
         CODIQO_IN_PER_COMMIT_TIMEOUT: ${{ inputs.per-commit-timeout }}
-        CODIQO_IN_PER_COMMIT_TIMEOUT_MINUTES: ${{ inputs.per-commit-timeout-minutes }}
         CODIQO_IN_PER_TEST_TIMEOUT: ${{ inputs.per-test-timeout }}
         CODIQO_IN_BUILD_TIMEOUT_MINUTES: ${{ inputs.build-timeout-minutes }}
         CODIQO_IN_TEST_TIMEOUT_MINUTES: ${{ inputs.test-timeout-minutes }}

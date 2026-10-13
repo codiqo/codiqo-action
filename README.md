@@ -85,9 +85,9 @@ tests under Gradle, set `gradle-tasks` to something cheaper (`classes`) or to `'
 Gradle release refuses a JDK newer than it knows about. Backfilling a window that spans a Gradle
 upgrade may need `java-version` lowered to what the oldest wrapper accepts.
 
-**Several features are Maven-only.** The time machine (`time-machine` is ignored), structured
-build-failure capture, and therefore degraded diff-only scoring of a failed build. A Gradle commit
-whose build fails is reported as a failure rather than scored from its diff, and historical commits
+**Several features are Maven-only.** The time machine (`time-machine` is ignored) and structured
+build-failure capture: Gradle cannot tell a dependency failure or a timeout from a broken build, so with
+the review on it scores every failed build from the review. Historical commits
 resolve today's snapshot dependencies rather than the ones current at the time. The Gradle plugin
 also has no equivalent of the analysis-tuning inputs, so these are accepted and ignored under
 `build-tool: gradle`: `settings-xml`, `dump-analysis`, `move-detection`, `move-similarity-threshold`,
@@ -203,8 +203,6 @@ on:
 | `api-connect-timeout-seconds` | `30` | |
 | `api-read-timeout-seconds` | `60` | |
 
-`per-commit-timeout-minutes` is deprecated; `per-commit-timeout` accepts plain minutes.
-
 The three limits nest, and the order matters. `per-commit-timeout` is enforced from outside the JVM and kills
 the whole analysis; `build-timeout-minutes` ends one forked build, which is what lets codiqo record the commit
 as a build failure instead of dying with it; `test-timeout-minutes` ends the test phase, leaving the build free
@@ -248,7 +246,7 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 
 ### Local review
 
-Maven only; see [Local review](#local-review) for what it costs and which commit it reviews.
+Maven and Gradle; see [Local review](#local-review) for what it costs and which commit it reviews.
 
 | Input | Default | Description |
 | --- | --- | --- |

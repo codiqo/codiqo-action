@@ -70,10 +70,6 @@ codiqo::_require_minutes() {
 }
 
 per_commit_raw="${CODIQO_IN_PER_COMMIT_TIMEOUT:-}"
-if [ -z "$per_commit_raw" ] && [ -n "${CODIQO_IN_PER_COMMIT_TIMEOUT_MINUTES:-}" ]; then
-    codiqo::warn "per-commit-timeout-minutes is deprecated; use per-commit-timeout (accepts 30m, 1h, 90m, 2h or raw minutes)."
-    per_commit_raw="${CODIQO_IN_PER_COMMIT_TIMEOUT_MINUTES}"
-fi
 case "${per_commit_raw:-1h}" in
     30m) per_commit_minutes=30 ;;
     1h | '') per_commit_minutes=60 ;;
