@@ -85,10 +85,10 @@ esac
 # The local review runs beside the build inside this deadline, and its labelling and triage follow-ups
 # run after the build. A deadline the review cannot fit kills the whole analysis instead of letting the
 # review time out on its own, and stop-on-first-failure then ends the run, so with the review on the
-# deadline is raised to the review's limit plus a margin. The plugin's review default is 60 minutes
+# deadline is raised to the review's limit plus a margin. The plugin's review default is 90 minutes
 # since its reviewers took 64 steps; the caller workflows still pass 1h, so the floor has to live here.
 #
-REVIEW_PLUGIN_DEFAULT_MINUTES=60
+REVIEW_PLUGIN_DEFAULT_MINUTES=90
 REVIEW_MARGIN_MINUTES=30
 if [ "${CODIQO_IN_REVIEW:-false}" = "true" ]; then
     review_limit_raw="${CODIQO_IN_REVIEW_TIMEOUT_MINUTES:-$REVIEW_PLUGIN_DEFAULT_MINUTES}"

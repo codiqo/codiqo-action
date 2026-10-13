@@ -133,10 +133,10 @@ on:
   temporary clone the analysis builds it in, so a run that backfills many historical commits reviews
   each of them: one paid review per commit. A commit that changes no file the analysis reads (only
   a workflow file, say) logs `local review skipped` and costs nothing.
-- **It takes time.** A review can take several minutes, and up to `review-timeout-minutes` (60 by
+- **It takes time.** A review can take several minutes, and up to `review-timeout-minutes` (90 by
   default). It runs beside the build but is awaited before scoring, so it must fit inside
   `per-commit-timeout`: with the review on, that deadline is raised to at least the review limit plus
-  30 minutes (90 by default), with a warning. Being on by default, it also reviews every commit a scheduled catch-up or a
+  30 minutes (120 by default), with a warning. Being on by default, it also reviews every commit a scheduled catch-up or a
   first run with a long `commit-window` backfills; shorten `commit-window` if that backlog is not
   worth a review per commit.
 - **A review that fails excludes the commit** (category `LOCAL_REVIEW_FAILURE`), so no later run
@@ -196,7 +196,7 @@ on:
 
 | Input | Default | Description |
 | --- | --- | --- |
-| `per-commit-timeout` | `1h` | `30m`, `1h`, `90m`, `2h`, or raw minutes. The outer deadline everything else is fitted under. With `review` on it is raised to at least `review-timeout-minutes` plus 30 (90 by default). |
+| `per-commit-timeout` | `1h` | `30m`, `1h`, `90m`, `2h`, or raw minutes. The outer deadline everything else is fitted under. With `review` on it is raised to at least `review-timeout-minutes` plus 30 (120 by default). |
 | `build-timeout-minutes` | `45` | Forked build of one commit. Three quarters of `per-commit-timeout`; a larger value is clamped back to that with a warning. |
 | `test-timeout-minutes` | `30` | Test phase of the forked build. Clamped to three quarters of the build timeout. |
 | `per-test-timeout` | `15m` | One JUnit 5 test method; `off` disables. Capped at 15 minutes and at half the test-phase budget. |
@@ -252,7 +252,7 @@ Maven and Gradle; see [Local review](#local-review) for what it costs and which 
 | Input | Default | Description |
 | --- | --- | --- |
 | `review` | `true` | Local mode (`-Dcodiqo.review`): review, assess and triage every analysed commit, scored from that assessment alone. Spends the organization's LLM budget through the Codiqo proxy, authenticated with `api-key`. |
-| `review-timeout-minutes` | `''` | Limit for one review (`-Dcodiqo.review.timeoutMinutes`). Empty uses the plugin default of 60. `per-commit-timeout` is raised to fit it plus 30 minutes. |
+| `review-timeout-minutes` | `''` | Limit for one review (`-Dcodiqo.review.timeoutMinutes`). Empty uses the plugin default of 90. `per-commit-timeout` is raised to fit it plus 30 minutes. |
 | `opencode-version` | `2.0.25` | Version of the OpenCode CLI (`@opencode/cli` on npm) installed for the review. |
 
 ### Analysis depth

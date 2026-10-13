@@ -337,7 +337,7 @@ inputs:
     required: false
     default: 'true'
   review-timeout-minutes:
-    description: 'Limit for one review (-Dcodiqo.review.timeoutMinutes). Empty uses the plugin default of 60 minutes. The review runs inside per-commit-timeout, so with the review on that deadline is raised to at least this limit plus 30 minutes, with a warning. Only with review: true.'
+    description: 'Limit for one review (-Dcodiqo.review.timeoutMinutes). Empty uses the plugin default of 90 minutes. The review runs inside per-commit-timeout, so with the review on that deadline is raised to at least this limit plus 30 minutes, with a warning. Only with review: true.'
     required: false
     default: ''
   opencode-version:
