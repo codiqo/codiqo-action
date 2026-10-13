@@ -81,6 +81,29 @@ case "${per_commit_raw:-1h}" in
         ;;
 esac
 
+#
+# The local review runs beside the build inside this deadline, and its labelling and triage follow-ups
+# run after the build. A deadline the review cannot fit kills the whole analysis instead of letting the
+# review time out on its own, and stop-on-first-failure then ends the run, so with the review on the
+# deadline is raised to the review's limit plus a margin. The plugin's review default is 60 minutes
+# since its reviewers took 64 steps; the caller workflows still pass 1h, so the floor has to live here.
+#
+REVIEW_PLUGIN_DEFAULT_MINUTES=60
+REVIEW_MARGIN_MINUTES=30
+if [ "${CODIQO_IN_REVIEW:-false}" = "true" ]; then
+    review_limit_raw="${CODIQO_IN_REVIEW_TIMEOUT_MINUTES:-$REVIEW_PLUGIN_DEFAULT_MINUTES}"
+    case "$review_limit_raw" in
+        '' | *[!0-9]*) ;; # validated with the other review settings below
+        *)
+            review_floor=$(( review_limit_raw + REVIEW_MARGIN_MINUTES ))
+            if [ "$per_commit_minutes" -lt "$review_floor" ]; then
+                codiqo::warn "per-commit-timeout ${per_commit_minutes}m cannot hold a ${review_limit_raw}m review and its follow-ups; using ${review_floor}m."
+                per_commit_minutes="$review_floor"
+            fi
+            ;;
+    esac
+fi
+
 case "${CODIQO_IN_PER_TEST_TIMEOUT:-15m}" in
     off | 0) per_test_minutes=0 ;;
     5m) per_test_minutes=5 ;;
@@ -200,10 +223,11 @@ if [ "$review" = "true" ] && [ -n "${CODIQO_IN_REVIEW_TIMEOUT_MINUTES:-}" ]; the
 fi
 #
 # The review runs beside the build and is awaited before scoring, so it lives inside the per-commit
-# deadline too. 30 is the plugin's own default when the property is absent.
+# deadline too; the floor above normally guarantees it fits. REVIEW_PLUGIN_DEFAULT_MINUTES is the
+# plugin's own default when the property is absent.
 #
-if [ "$review" = "true" ] && [ "${review_timeout_minutes:-30}" -ge "$per_commit_minutes" ]; then
-    codiqo::warn "the ${review_timeout_minutes:-30}m review timeout does not fit inside the ${per_commit_minutes}m per-commit deadline; a slow review kills the whole analysis instead of timing out on its own. Lower review-timeout-minutes or raise per-commit-timeout."
+if [ "$review" = "true" ] && [ "${review_timeout_minutes:-$REVIEW_PLUGIN_DEFAULT_MINUTES}" -ge "$per_commit_minutes" ]; then
+    codiqo::warn "the ${review_timeout_minutes:-$REVIEW_PLUGIN_DEFAULT_MINUTES}m review timeout does not fit inside the ${per_commit_minutes}m per-commit deadline; a slow review kills the whole analysis instead of timing out on its own. Lower review-timeout-minutes or raise per-commit-timeout."
 fi
 
 # ----------------------------------------------------------------------------- build command
