@@ -194,7 +194,7 @@ inputs:
 
   # ----------------------------------------------------------------------------------- behaviour
   score-on-build-failure:
-    description: 'Score a commit from its diff alone when its build fails, instead of excluding it. The result carries a capped quality multiplier. With review on, a build the commit broke is always scored, from the local review''s assessment; an unresolvable dependency or a timeout stays excluded.'
+    description: 'A build the commit broke is always scored from its local review, with a capped quality multiplier. Turn this on to score, the same way, a commit whose build failed for a reason outside it (an unresolvable dependency, a timeout), which is otherwise excluded. Maven only: Gradle cannot tell those apart, so it scores every failed build.'
     required: false
     default: 'false'
   exclude-reverted-commits:
@@ -330,7 +330,7 @@ inputs:
     required: false
     default: ''
   agent-instructions:
-    description: 'Attach the repository''s agent instruction files (AGENTS.md, CLAUDE.md, .github/copilot-instructions.md, .cursorrules, .cursor/rules, and equivalents) to the scoring prompt. They are a hint for finding triage only: they stop the model reporting your documented idioms as defects and shape suggested fixes, and are barred from changing any score. Set to false to keep them out of the prompt entirely.'
+    description: 'Attach the repository''s agent instruction files (AGENTS.md, CLAUDE.md, .github/copilot-instructions.md, .cursorrules, .cursor/rules, and equivalents) to the local review. They are a hint for finding triage only: they stop the model reporting your documented idioms as defects and shape suggested fixes, and are barred from changing any score. Set to false to keep them out of the review entirely.'
     required: false
     default: 'true'
   agent-instruction-files:
@@ -342,7 +342,7 @@ inputs:
     required: false
     default: ''
   review:
-    description: 'Local mode (-Dcodiqo.review): an OpenCode review, with a CLI this action installs, reviews and assesses every analysed commit in that commit''s own checkout, judges its PMD and SpotBugs findings after the build, and the server scores the commit from that assessment alone. A review that fails excludes the commit. It authenticates to the Codiqo LLM proxy with api-key and spends the organization''s LLM budget; expect several minutes per reviewed commit. On by default; set it to false to have the server''s prompt score commits instead. Maven only: under build-tool: gradle it is skipped.'
+    description: 'Local mode (-Dcodiqo.review): an OpenCode review, with a CLI this action installs, reviews and assesses every analysed commit in that commit''s own checkout, judges its PMD and SpotBugs findings after the build, and the server scores the commit from that assessment alone. A review that fails excludes the commit. It authenticates to the Codiqo LLM proxy with api-key and spends the organization''s LLM budget; expect several minutes per reviewed commit. On by default and needed for scoring: the server has no prompt of its own, so with review: false every commit is excluded. Works under build-tool: maven and gradle.'
     required: false
     default: 'true'
   review-timeout-minutes:
@@ -350,7 +350,7 @@ inputs:
     required: false
     default: ''
   opencode-version:
-    description: 'Version of the OpenCode CLI (npm package @opencode/cli) installed for the review. Needs npm on the runner. Only installed with review: true and build-tool: maven.'
+    description: 'Version of the OpenCode CLI (npm package @opencode/cli) installed for the review. Needs npm on the runner. Only installed with review: true.'
     required: false
     default: '2.0.25'
   stop-on-first-failure:
@@ -553,14 +553,14 @@ runs:
     # fetched from npm on every run. Skipped, like the install, when nothing is pending.
     #
     - name: Cache the OpenCode CLI
-      if: inputs.review == 'true' && inputs.build-tool != 'gradle' && steps.index.outputs.missing-count != '0'
+      if: inputs.review == 'true' && steps.index.outputs.missing-count != '0'
       uses: actions/cache@v6
       with:
         path: ${{ runner.tool_cache }}/codiqo-opencode/${{ inputs.opencode-version }}
         key: codiqo-opencode-${{ runner.os }}-${{ runner.arch }}-${{ inputs.opencode-version }}
 
     - name: Set up OpenCode ${{ inputs.opencode-version }}
-      if: inputs.review == 'true' && inputs.build-tool != 'gradle' && steps.index.outputs.missing-count != '0'
+      if: inputs.review == 'true' && steps.index.outputs.missing-count != '0'
       shell: bash
       run: "$GITHUB_ACTION_PATH/scripts/setup-opencode.sh"
       env:

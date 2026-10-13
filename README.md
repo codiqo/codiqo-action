@@ -109,8 +109,8 @@ reach it either. It defaults to 8g, which is worth lowering on a standard runner
 Local mode is on by default (`review: true`): the plugin runs its local agent review beside the
 analysis, an [OpenCode](https://opencode.ai) session reads the commit and the code around it, reviews
 and assesses it and judges its PMD and SpotBugs findings after the build, and the server scores the
-commit from that assessment alone. Set `review: false` to have the server's prompt score commits
-instead. There are no other review switches. Maven only.
+commit from that assessment alone. The server has no prompt of its own, so with `review: false`
+every commit is excluded. There are no other review switches. It works with Maven and Gradle.
 
 ```yaml
 on:
@@ -123,7 +123,7 @@ on:
       - uses: codiqo/codiqo-action@main
         with:
           api-key: ${{ secrets.CODIQO_API_KEY }}
-          # review: false   # opt out of local mode; the server's prompt scores the commits
+          # review: false   # skips the review; every commit is then excluded
 ```
 
 - **It spends your organization's LLM budget.** The review's model calls go through the Codiqo LLM
@@ -136,11 +136,10 @@ on:
 - **It takes time.** A review can take several minutes, and up to `review-timeout-minutes` (30 by
   default). It runs beside the build but is awaited before scoring, so it must fit inside
   `per-commit-timeout`. Being on by default, it also reviews every commit a scheduled catch-up or a
-  first run with a long `commit-window` backfills; set `review: false` on such a workflow if that
-  backlog should be scored by the server's prompt instead.
-- **A review that fails excludes the commit** (category `LOCAL_REVIEW_FAILURE`), so the server's
-  prompt never judges a commit of local mode and no later run pays for the review again. Deleting the
-  analysis retries it.
+  first run with a long `commit-window` backfills; shorten `commit-window` if that backlog is not
+  worth a review per commit.
+- **A review that fails excludes the commit** (category `LOCAL_REVIEW_FAILURE`), so no later run
+  pays for the review again. Deleting the analysis retries it.
 - **OpenCode is installed by the action**, from npm as `@opencode/cli` at `opencode-version`
   (default `2.0.25`, the version the engine is validated with), into the runner tool cache, and is
   cached with `actions/cache` per runner OS, architecture and version. This needs `npm` on the
@@ -232,7 +231,7 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 
 | Input | Default | Description |
 | --- | --- | --- |
-| `score-on-build-failure` | `false` | Score from the diff alone when a build fails, instead of excluding the commit. With `review` on, a build the commit broke is always scored, from the local review's assessment; an unresolvable dependency or a timeout stays excluded. |
+| `score-on-build-failure` | `false` | A build the commit broke is always scored from its local review. Turn this on to score, the same way, a commit whose build failed for a reason outside it (an unresolvable dependency, a timeout), which is otherwise excluded. Maven only: Gradle scores every failed build. |
 | `exclude-reverted-commits` | `true` | Analysing a revert also retroactively excludes what it reverted, so reverted work stops counting. |
 | `ignore-coverage` | `false` | Skip tests in the forked build. Much faster, no coverage data. Maven only in that sense: under Gradle the tasks are on the action's own command line, so this drops jacoco and the coverage analysis but does not stop the tests — use `gradle-tasks` for that. |
 | `time-machine` | `true` | Resolve a historical commit's snapshot dependencies as of that commit. |
@@ -244,7 +243,7 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 | `fail-on-uninstrumented-module` | `true` | Fail when a module with tests produced no coverage data, which usually means the coverage agent never attached. |
 | `fail-on-jdtls-error` | `false` | Fail when the language server reports an error during import. Off by default: an import warning usually degrades blast-radius data rather than invalidating the analysis. |
 | `move-detection` | `true` | Charge relocated code a small relocation cost instead of full per-line effort. |
-| `agent-instructions` | `true` | Attach the repository's agent instruction files (`AGENTS.md`, `CLAUDE.md`, and equivalents) to the scoring prompt as a triage hint. They cannot change any score. |
+| `agent-instructions` | `true` | Attach the repository's agent instruction files (`AGENTS.md`, `CLAUDE.md`, and equivalents) to the local review as a triage hint. They cannot change any score. |
 | `agent-instruction-files` | `''` | Comma-separated extra instruction paths, relative to the repository root. A path may name a file or a directory of rule files. |
 | `agent-instructions-max-chars` | `''` | Ceiling on the assembled instruction text. Exceeding it fails the analysis rather than truncating. Empty uses the engine default (64 KiB). |
 

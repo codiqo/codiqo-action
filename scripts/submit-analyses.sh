@@ -223,6 +223,18 @@ for commit in "${commits[@]}"; do
         if [ -n "${CODIQO_IN_INCLUDE_AUTHOR_EMAILS:-}" ]; then cmd+=("-Pcodiqo.includeAuthorEmails=${CODIQO_IN_INCLUDE_AUTHOR_EMAILS}"); fi
         if [ -n "${CODIQO_IN_INCLUDE_BRANCHES:-}" ]; then cmd+=("-Pcodiqo.includeBranches=${CODIQO_IN_INCLUDE_BRANCHES}"); fi
         if [ -n "${CODIQO_IN_JAVA_HOME:-}" ]; then cmd+=("-Pcodiqo.javaHome=${CODIQO_IN_JAVA_HOME}"); fi
+        #
+        # The Gradle plugin reviews the checked-out commit beside the build, with the same settings
+        # as Maven passed as project properties.
+        #
+        if [ "${CODIQO_REVIEW:-false}" = "true" ]; then
+            cmd+=("-Pcodiqo.review=true")
+            cmd+=("-Pcodiqo.review.executable=${CODIQO_OPENCODE_EXECUTABLE:?the OpenCode install step did not run}")
+            cmd+=("-Pcodiqo.review.traceDirectory=$CODIQO_LOGS_DIR/review-trace")
+            if [ -n "${CODIQO_REVIEW_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Pcodiqo.review.timeoutMinutes=${CODIQO_REVIEW_TIMEOUT_MINUTES}"); fi
+        else
+            cmd+=("-Pcodiqo.review=false")
+        fi
         if [ -n "${CODIQO_IN_JDTLS_VERSION:-}" ]; then cmd+=("-Pcodiqo.jdtlsVersion=${CODIQO_IN_JDTLS_VERSION}"); fi
         if [ -n "${CODIQO_IN_IMPORT_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Pcodiqo.importTimeoutMinutes=${CODIQO_IN_IMPORT_TIMEOUT_MINUTES}"); fi
         if [ -n "${CODIQO_IN_API_CONNECT_TIMEOUT:-}" ]; then cmd+=("-Pcodiqo.connectTimeoutSeconds=${CODIQO_IN_API_CONNECT_TIMEOUT}"); fi
@@ -332,9 +344,8 @@ for commit in "${commits[@]}"; do
     if [ -n "${CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS:-}" ]; then cmd+=("-Dcodiqo.llm.conventionFilesMaxChars=${CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS}"); fi
 
     #
-    # Passed for every commit, but the goal reviews only the commit that is the workspace's clean HEAD
-    # (the review's agents read the working tree), so a backlog spends review budget on the tip alone
-    # and logs "local review skipped" for the rest. The proxy is reached with the same API key.
+    # Every analysed commit is reviewed in the analysis clone, which holds that commit as its clean
+    # HEAD, so a backlog pays for one review per commit. The proxy is reached with the same API key.
     #
     if [ "${CODIQO_REVIEW:-false}" = "true" ]; then
         cmd+=("-Dcodiqo.review=true")
@@ -343,6 +354,8 @@ for commit in "${commits[@]}"; do
         # redacted and uploaded with them.
         cmd+=("-Dcodiqo.review.traceDirectory=$CODIQO_LOGS_DIR/review-trace")
         if [ -n "${CODIQO_REVIEW_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Dcodiqo.review.timeoutMinutes=${CODIQO_REVIEW_TIMEOUT_MINUTES}"); fi
+    else
+        cmd+=("-Dcodiqo.review=false")
     fi
 
     #
