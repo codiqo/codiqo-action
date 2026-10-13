@@ -70,6 +70,19 @@ fi
 
 rc=0
 codiqo::run_step "codiqo-index" "${cmd[@]}" || rc=$?
+
+#
+# This is the first step to download the Codiqo plugin. A snapshot being published at that moment
+# can leave its metadata pointing at jars the repository does not serve yet, and the step fails to
+# resolve the plugin. Only that failure is retried, once, after the publish has had time to finish;
+# any other failure stops the job as before.
+#
+if [ "$rc" -ne 0 ] && grep -qE "(Plugin|Could not find artifact|Could not resolve).*io\.codiqo[.:]codiqo-(maven|gradle)-plugin" "$CODIQO_LOGS_DIR/codiqo-index.log"; then
+    codiqo::warn "the Codiqo plugin could not be downloaded, likely while a new snapshot was being published; retrying in 2 minutes."
+    sleep 120
+    rc=0
+    codiqo::run_step "codiqo-index" "${cmd[@]}" || rc=$?
+fi
 codiqo::emit_log_warnings "$CODIQO_LOGS_DIR/codiqo-index.log"
 
 if ! reason=$(codiqo::assert_build_success "$CODIQO_LOGS_DIR/codiqo-index.log" "$rc"); then
