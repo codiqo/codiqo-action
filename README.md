@@ -231,7 +231,6 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 
 | Input | Default | Description |
 | --- | --- | --- |
-| `score-on-build-failure` | `false` | A build the commit broke is always scored from its local review. Turn this on to score, the same way, a commit whose build failed for a reason outside it (an unresolvable dependency, a timeout), which is otherwise excluded. Maven only: Gradle scores every failed build. |
 | `exclude-reverted-commits` | `true` | Analysing a revert also retroactively excludes what it reverted, so reverted work stops counting. |
 | `ignore-coverage` | `false` | Skip tests in the forked build. Much faster, no coverage data. Maven only in that sense: under Gradle the tasks are on the action's own command line, so this drops jacoco and the coverage analysis but does not stop the tests — use `gradle-tasks` for that. |
 | `time-machine` | `true` | Resolve a historical commit's snapshot dependencies as of that commit. |

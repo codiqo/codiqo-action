@@ -193,10 +193,6 @@ inputs:
     default: 'false'
 
   # ----------------------------------------------------------------------------------- behaviour
-  score-on-build-failure:
-    description: 'A build the commit broke is always scored from its local review, with a capped quality multiplier. Turn this on to score, the same way, a commit whose build failed for a reason outside it (an unresolvable dependency, a timeout), which is otherwise excluded. Maven only: Gradle cannot tell those apart, so it scores every failed build.'
-    required: false
-    default: 'false'
   exclude-reverted-commits:
     description: 'When a revert is analysed, also retroactively exclude the commit it reverted, so reverted work stops counting.'
     required: false
@@ -579,7 +575,6 @@ runs:
         CODIQO_IN_EXCLUDE_AUTHOR_EMAILS: ${{ inputs.exclude-author-emails }}
         CODIQO_IN_INCLUDE_AUTHOR_EMAILS: ${{ inputs.include-author-emails }}
         CODIQO_IN_FIRST_PARENT_ONLY: ${{ inputs.first-parent-only }}
-        CODIQO_IN_SCORE_ON_BUILD_FAILURE: ${{ inputs.score-on-build-failure }}
         CODIQO_IN_EXCLUDE_REVERTED_COMMITS: ${{ inputs.exclude-reverted-commits }}
         CODIQO_IN_IGNORE_COVERAGE: ${{ inputs.ignore-coverage }}
         CODIQO_IN_TIME_MACHINE: ${{ inputs.time-machine }}
