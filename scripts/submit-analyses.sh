@@ -99,17 +99,82 @@ loop_start=$(date +%s)
 index=0
 
 #
+# The cause and trace of an ABORT line the plugin wrote to the commit's progress file
+# (epochMillis, ABORT, cause, trace; tab-separated), or nothing when it wrote none.
+#
+codiqo::abort_reason() {
+    local file="$1"
+    if [ -n "$file" ] && [ -f "$file" ]; then
+        awk -F '\t' '$2 == "ABORT" { print $3 " [" $4 "]"; exit }' "$file"
+    fi
+}
+
+#
+# Halts the project on the server after a failed commit, so the next scheduled run does not pay for
+# the same commit's review again, and succeeds only when the server recorded the halt.
+# submit-commit-analysis halts it itself when it fails inside its JVM; this covers a run killed from
+# outside (the per-commit deadline, an OOM kill), which leaves no exception to report, and records
+# again a halt the plugin reported, in case the plugin could not record it. The server keeps the
+# first halt, so a run that halted the project keeps its own reason. Maven only: the Gradle plugin
+# has no halt task yet. A failed halt is a warning, never a second failure of the commit. The call
+# retries for up to 15 minutes while the server is unreachable, so it runs under the heartbeat.
+#
+codiqo::halt_project() {
+    local commit="$1" reason="$2" log="$3" rc=0
+    if [ "${CODIQO_BUILD_TOOL:-maven}" = "gradle" ]; then
+        return 1
+    fi
+    local halt=("$CODIQO_BUILD_CMD" -B -ntp -N)
+    halt+=(${extra_args[@]+"${extra_args[@]}"})
+    halt+=(${user_props[@]+"${user_props[@]}"})
+    halt+=("${plugin}:halt-project")
+    halt+=("-Dcodiqo.commitId=${commit}")
+    halt+=("-Dcodiqo.apiKey=env:CODIQO_API_KEY")
+    halt+=("-Dcodiqo.haltReason=${reason}")
+    halt+=("-Dcodiqo.haltLogFile=${log}")
+    if [ -n "${CODIQO_IN_API_URL:-}" ]; then halt+=("-Dcodiqo.apiUrl=${CODIQO_IN_API_URL}"); fi
+    if [ -n "${CODIQO_IN_API_CONNECT_TIMEOUT:-}" ]; then halt+=("-Dcodiqo.connectTimeoutSeconds=${CODIQO_IN_API_CONNECT_TIMEOUT}"); fi
+    if [ -n "${CODIQO_IN_API_READ_TIMEOUT:-}" ]; then halt+=("-Dcodiqo.readTimeoutSeconds=${CODIQO_IN_API_READ_TIMEOUT}"); fi
+    codiqo::run_step "halt-${commit}" "${halt[@]}" || rc=$?
+    if [ "$rc" -eq 0 ]; then
+        return 0
+    fi
+    codiqo::warn "commit $commit: could not halt the project (exit $rc); see halt-${commit}.log. The next scheduled run will try this commit again."
+    return 1
+}
+
+#
+# Stops the run because the project is halted, whatever stop-on-first-failure says: every further
+# commit would fail against the halt and pay for nothing.
+#
+codiqo::abort_run() {
+    local index="$1" total="$2" abort="$3"
+    codiqo::error "aborting the run: the project is halted until an administrator resumes it in Codiqo. Cause: $abort"
+    codiqo::output "abort-reason" "$abort"
+    codiqo::output "analysed-count" "$analysed"
+    codiqo::output "failed-count" "$failed"
+    codiqo::log "$((total - index)) commit(s) left unattempted."
+}
+
+#
 # One commit's outcome, shared by both build-tool branches so the counters, the messages and the
-# stop-on-first-failure rule cannot drift between them. Returns non-zero when the caller must stop.
+# stop rules cannot drift between them. Returns non-zero when the caller must stop.
 #
 codiqo::report_commit_result() {
-    local commit="$1" index="$2" total="$3" rc="$4" log="$5" loop_start="$6"
-    local reason
+    local commit="$1" index="$2" total="$3" rc="$4" log="$5" loop_start="$6" progress="$7"
+    local reason abort
     if reason=$(codiqo::assert_build_success "$log" "$rc"); then
         analysed=$((analysed + 1))
         codiqo::log "  ok ($index/$total, ${CODIQO_LAST_ELAPSED}s, $(($(date +%s) - loop_start))s cumulative)"
         return 0
     fi
+
+    #
+    # The plugin halted the project because the analysis itself cannot work (the LLM cannot be
+    # reached, coverage cannot be measured): every further commit would fail the same way and pay
+    # for nothing, so the whole run stops after this commit, whatever stop-on-first-failure says.
+    #
+    abort=$(codiqo::abort_reason "$progress")
 
     #
     # Gradle exits non-zero whenever any task failed, and --continue exists precisely so a Test task
@@ -124,6 +189,14 @@ codiqo::report_commit_result() {
         analysed=$((analysed + 1))
         codiqo::warn "commit $commit: the build $reason, but the analysis was accepted — counting it as analysed."
         codiqo::log "  ok ($index/$total, ${CODIQO_LAST_ELAPSED}s, $(($(date +%s) - loop_start))s cumulative)"
+        #
+        # A worker that failed after its submission was accepted (while it shut down, say) halted
+        # the project all the same, and a halted project fails every later commit.
+        #
+        if [ -n "$abort" ]; then
+            codiqo::abort_run "$index" "$total" "$abort"
+            return 1
+        fi
         return 0
     fi
 
@@ -138,6 +211,25 @@ codiqo::report_commit_result() {
         codiqo::error "commit $commit $reason."
     fi
     codiqo::tail_log "$log"
+
+    #
+    # A run killed from outside its JVM left the plugin no exception to halt the project with, so it
+    # is halted here, and the run stops as one the plugin halted would. Any other failure without an
+    # ABORT line (no credential, the server unreachable before the analysis started, a project
+    # already halted, a stopped run) is one the plugin chose not to halt for, and stays unhalted.
+    #
+    if [ -n "$abort" ]; then
+        codiqo::halt_project "$commit" "$abort" "$log" || true
+    elif [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+        reason="the analysis run of commit $commit exceeded the ${CODIQO_PER_COMMIT_TIMEOUT_MINUTES}m per-commit deadline or was killed (exit $rc)"
+        if codiqo::halt_project "$commit" "$reason" "$log"; then
+            abort="$reason [see submit-${commit}.log]"
+        fi
+    fi
+    if [ -n "$abort" ]; then
+        codiqo::abort_run "$index" "$total" "$abort"
+        return 1
+    fi
 
     if [ "${CODIQO_IN_STOP_ON_FIRST_FAILURE:-true}" = "true" ]; then
         codiqo::output "analysed-count" "$analysed"
@@ -210,6 +302,8 @@ for commit in "${commits[@]}"; do
         cmd+=("-Pcodiqo.ignoreDiagnostics=${CODIQO_IN_IGNORE_DIAGNOSTICS:-false}")
         cmd+=("-Pcodiqo.skipOnBuildFailure=${CODIQO_IN_SKIP_ON_BUILD_FAILURE:-true}")
         cmd+=("-Pcodiqo.failOnUninstrumentedModule=${CODIQO_IN_FAIL_ON_UNINSTRUMENTED_MODULE:-true}")
+        if [ -n "${CODIQO_IN_TEST_FAILURE_HALT_SHARE:-}" ]; then cmd+=("-Pcodiqo.testFailureHaltShare=${CODIQO_IN_TEST_FAILURE_HALT_SHARE}"); fi
+        if [ -n "${CODIQO_IN_TEST_FAILURE_HALT_MIN_TESTS:-}" ]; then cmd+=("-Pcodiqo.testFailureHaltMinTests=${CODIQO_IN_TEST_FAILURE_HALT_MIN_TESTS}"); fi
         cmd+=("-Pcodiqo.failOnJdtlsError=${CODIQO_IN_FAIL_ON_JDTLS_ERROR:-false}")
         cmd+=("-Pcodiqo.jdtUseSharedIndex=${CODIQO_IN_JDT_USE_SHARED_INDEX:-true}")
         cmd+=("-Pcodiqo.jdtIncludeDecompiledSources=${CODIQO_IN_JDT_INCLUDE_DECOMPILED_SOURCES:-false}")
@@ -270,7 +364,7 @@ for commit in "${commits[@]}"; do
             "$CODIQO_BUILD_CMD" --stop > /dev/null 2>&1 || true
         fi
         codiqo::emit_log_warnings "$log"
-        codiqo::report_commit_result "$commit" "$index" "$total" "$rc" "$log" "$loop_start" || exit $?
+        codiqo::report_commit_result "$commit" "$index" "$total" "$rc" "$log" "$loop_start" "$progress" || exit $?
         continue
     fi
 
@@ -295,6 +389,8 @@ for commit in "${commits[@]}"; do
     cmd+=("-Dcodiqo.llm.autoDiscoveryAgentInstructions=${CODIQO_IN_AGENT_INSTRUCTIONS:-true}")
     cmd+=("-Dcodiqo.skipOnBuildFailure=${CODIQO_IN_SKIP_ON_BUILD_FAILURE:-true}")
     cmd+=("-Dcodiqo.failOnUninstrumentedModule=${CODIQO_IN_FAIL_ON_UNINSTRUMENTED_MODULE:-true}")
+    if [ -n "${CODIQO_IN_TEST_FAILURE_HALT_SHARE:-}" ]; then cmd+=("-Dcodiqo.testFailureHaltShare=${CODIQO_IN_TEST_FAILURE_HALT_SHARE}"); fi
+    if [ -n "${CODIQO_IN_TEST_FAILURE_HALT_MIN_TESTS:-}" ]; then cmd+=("-Dcodiqo.testFailureHaltMinTests=${CODIQO_IN_TEST_FAILURE_HALT_MIN_TESTS}"); fi
     cmd+=("-Dcodiqo.failOnJdtlsError=${CODIQO_IN_FAIL_ON_JDTLS_ERROR:-false}")
     cmd+=("-Dcodiqo.ignoreComplexity=${CODIQO_IN_IGNORE_COMPLEXITY:-false}")
     cmd+=("-Dcodiqo.ignoreCpd=${CODIQO_IN_IGNORE_CPD:-false}")
@@ -369,7 +465,7 @@ for commit in "${commits[@]}"; do
     CODIQO_STEP_TIMEOUT_SECONDS="$CODIQO_PER_COMMIT_TIMEOUT_SECONDS" CODIQO_PROGRESS_FILE="$progress" \
         codiqo::run_step "submit-${commit}" "${cmd[@]}" || rc=$?
     codiqo::emit_log_warnings "$log"
-    codiqo::report_commit_result "$commit" "$index" "$total" "$rc" "$log" "$loop_start" || exit $?
+    codiqo::report_commit_result "$commit" "$index" "$total" "$rc" "$log" "$loop_start" "$progress" || exit $?
 done
 
 codiqo::output "analysed-count" "$analysed"

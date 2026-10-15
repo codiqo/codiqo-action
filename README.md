@@ -235,10 +235,12 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 | `time-machine` | `true` | Resolve a historical commit's snapshot dependencies as of that commit. |
 | `dump-analysis` | `true` | Write the submission document to disk. Without `analysis-output-directory` it lands in a runner temporary file and is not collected. |
 | `analysis-output-directory` | `''` | Where the dumped submission document is written. Point it inside the log directory to have it uploaded; one document per commit, so mind artifact size. Scoring is server-side here, so no local HTML report is produced. |
-| `stop-on-first-failure` | `true` | Stop at the first commit that genuinely fails to analyse (timeout, OOM, failed analysis run). Commits codiqo excludes do not count. |
+| `stop-on-first-failure` | `true` | Stop at the first commit that genuinely fails to analyse (timeout, OOM, failed analysis run). Commits codiqo excludes do not count. A failure that halts the project in Codiqo stops the run either way. |
 | `require-full-history` | `true` | Refuse to run on a shallow or filtered clone. |
 | `skip-on-build-failure` | `true` | Record a commit whose build fails as an exclusion. Turn off and a failed or timed-out build fails the step instead. |
 | `fail-on-uninstrumented-module` | `true` | Fail when a module with tests produced no coverage data, which usually means the coverage agent never attached. |
+| `test-failure-halt-share` | (plugin default 0.75) | Halt the project when at least this share of executed tests fail: most likely an environment the analysis cannot rebuild. `1` or more turns the check off, for tests that need a database or Docker the CI lacks. |
+| `test-failure-halt-min-tests` | (plugin default 20) | Fewer executed tests than this never halt the project. |
 | `fail-on-jdtls-error` | `false` | Fail when the language server reports an error during import. Off by default: an import warning usually degrades blast-radius data rather than invalidating the analysis. |
 | `move-detection` | `true` | Charge relocated code a small relocation cost instead of full per-line effort. |
 | `agent-instructions` | `true` | Attach the repository's agent instruction files (`AGENTS.md`, `CLAUDE.md`, and equivalents) to the local review as a triage hint. They cannot change any score. |
@@ -313,6 +315,7 @@ Leave them empty unless you are deliberately recalibrating.
 | `missing-count` | Commits that needed analysis. |
 | `analysed-count` | Commits analysed and submitted successfully. |
 | `failed-count` | Commits that failed. |
+| `abort-reason` | Why the run stopped because the project was halted in Codiqo; empty otherwise. |
 | `missing-file` | Path to the list of pending commits, oldest first. |
 | `logs-dir` | Directory holding the step and per-commit logs. |
 

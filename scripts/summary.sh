@@ -28,6 +28,11 @@ failed="${CODIQO_SUMMARY_FAILED:-0}"
     printf '| Failed | %s |\n' "$failed"
     printf '\n'
 
+    if [ -n "${CODIQO_SUMMARY_ABORT:-}" ]; then
+        printf '**The run was aborted:** the project is halted until an administrator resumes it in Codiqo.\n\n'
+        # a fenced block, not a code span: an exception message can carry a backtick of its own
+        printf 'Cause:\n\n```\n%s\n```\n\n' "$CODIQO_SUMMARY_ABORT"
+    fi
     if [ "$missing" = "0" ]; then
         printf 'No commits required analysis. If that is unexpected, confirm `actions/checkout` used `fetch-depth: 0` — an incomplete clone makes Codiqo skip commits whose parent is missing locally.\n'
     elif [ "$failed" != "0" ]; then

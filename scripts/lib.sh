@@ -174,7 +174,8 @@ codiqo::_cpu_sample() {
 # FAILED or SKIPPED lines for each module the build (the Maven fork's event spy or the Gradle
 # build service) works through, and STAGE_STARTED, STAGE_FINISHED or STAGE_FAILED lines for
 # each analysis stage, with its duration and an optional detail such as the peak heap. A plugin
-# too old to write the file leaves the log as it was.
+# too old to write the file leaves the log as it was. Any other line, such as the ABORT line that
+# submit-analyses.sh reads after the commit, is skipped rather than printed as a module event.
 #
 # Only newline-terminated lines are read, so a line caught mid-write waits for the next call.
 # The whole file is scanned each time to keep the done count, which stays cheap at a few
@@ -200,7 +201,7 @@ codiqo::_emit_progress() {
             printf "[stage] %s %s in %dm%02ds%s\n", $3, ($2 == "STAGE_FAILED" ? "FAILED" : "finished"), secs / 60, secs % 60, ($5 == "" ? "" : " (" $5 ")")
             next
         }
-        {
+        $2 == "SESSION" || $2 == "STARTED" || $2 == "SUCCESS" || $2 == "FAILED" || $2 == "SKIPPED" {
             # without the groupId (Maven) or the leading colon (Gradle)
             id = $3; sub(/^[^:]*:/, "", id)
             if ($2 == "SESSION") {
