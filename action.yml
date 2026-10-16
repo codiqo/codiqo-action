@@ -351,7 +351,7 @@ inputs:
   opencode-version:
     description: 'Version of the OpenCode CLI (npm package @opencode/cli) installed for the review. Needs npm on the runner. Only installed with review: true.'
     required: false
-    default: '2.0.25'
+    default: '2.0.29'
   stop-on-first-failure:
     description: 'Stop at the first commit that genuinely fails to analyse — a timeout, an out-of-memory kill, or a build failure of the analysis run itself. A commit codiqo excludes (unresolvable historical dependency, build failure of the analysed commit, no analyzable diff) is a normal outcome and never trips this. Turn it off to attempt every commit and fail the step at the end. A failure that halts the project in Codiqo stops the run either way.'
     required: false
