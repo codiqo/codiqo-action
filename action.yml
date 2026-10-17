@@ -220,12 +220,20 @@ inputs:
     description: 'Fail when a module produced no coverage data, which usually means the coverage agent was not attached. Turn off for reactors where some modules legitimately run no tests.'
     required: false
     default: 'true'
+  test-failure-hold-share:
+    description: 'Hold the commit''s score out of every figure until someone accepts it in Codiqo when at least this share of executed tests fail: the commit broke what its tests share, or the analysis could not rebuild their environment. The commit is still reviewed and scored. 1 or more turns the check off, for a project whose tests need a database or Docker the CI does not have. Empty keeps the plugin default (0.75).'
+    required: false
+    default: ''
+  test-failure-hold-min-tests:
+    description: 'Fewer executed tests than this never hold a score. Empty keeps the plugin default (20).'
+    required: false
+    default: ''
   test-failure-halt-share:
-    description: 'Halt the project when at least this share of executed tests fail (most likely an environment the analysis cannot rebuild, not the commit). 1 or more turns the check off, for a project whose tests need a database or Docker the CI does not have. Empty keeps the plugin default (0.75).'
+    description: 'Deprecated: the former name of test-failure-hold-share, used when that is empty.'
     required: false
     default: ''
   test-failure-halt-min-tests:
-    description: 'Fewer executed tests than this never halt the project. Empty keeps the plugin default (20).'
+    description: 'Deprecated: the former name of test-failure-hold-min-tests, used when that is empty.'
     required: false
     default: ''
   fail-on-jdtls-error:
@@ -587,8 +595,8 @@ runs:
         CODIQO_IN_INCLUDE_BRANCHES: ${{ inputs.include-branches }}
         CODIQO_IN_SKIP_ON_BUILD_FAILURE: ${{ inputs.skip-on-build-failure }}
         CODIQO_IN_FAIL_ON_UNINSTRUMENTED_MODULE: ${{ inputs.fail-on-uninstrumented-module }}
-        CODIQO_IN_TEST_FAILURE_HALT_SHARE: ${{ inputs.test-failure-halt-share }}
-        CODIQO_IN_TEST_FAILURE_HALT_MIN_TESTS: ${{ inputs.test-failure-halt-min-tests }}
+        CODIQO_IN_TEST_FAILURE_HOLD_SHARE: ${{ inputs.test-failure-hold-share || inputs.test-failure-halt-share }}
+        CODIQO_IN_TEST_FAILURE_HOLD_MIN_TESTS: ${{ inputs.test-failure-hold-min-tests || inputs.test-failure-halt-min-tests }}
         CODIQO_IN_FAIL_ON_JDTLS_ERROR: ${{ inputs.fail-on-jdtls-error }}
         CODIQO_IN_IGNORE_COMPLEXITY: ${{ inputs.ignore-complexity }}
         CODIQO_IN_IGNORE_CPD: ${{ inputs.ignore-cpd }}

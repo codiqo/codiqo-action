@@ -302,8 +302,8 @@ for commit in "${commits[@]}"; do
         cmd+=("-Pcodiqo.ignoreDiagnostics=${CODIQO_IN_IGNORE_DIAGNOSTICS:-false}")
         cmd+=("-Pcodiqo.skipOnBuildFailure=${CODIQO_IN_SKIP_ON_BUILD_FAILURE:-true}")
         cmd+=("-Pcodiqo.failOnUninstrumentedModule=${CODIQO_IN_FAIL_ON_UNINSTRUMENTED_MODULE:-true}")
-        if [ -n "${CODIQO_IN_TEST_FAILURE_HALT_SHARE:-}" ]; then cmd+=("-Pcodiqo.testFailureHaltShare=${CODIQO_IN_TEST_FAILURE_HALT_SHARE}"); fi
-        if [ -n "${CODIQO_IN_TEST_FAILURE_HALT_MIN_TESTS:-}" ]; then cmd+=("-Pcodiqo.testFailureHaltMinTests=${CODIQO_IN_TEST_FAILURE_HALT_MIN_TESTS}"); fi
+        if [ -n "${CODIQO_IN_TEST_FAILURE_HOLD_SHARE:-}" ]; then cmd+=("-Pcodiqo.testFailureHoldShare=${CODIQO_IN_TEST_FAILURE_HOLD_SHARE}"); fi
+        if [ -n "${CODIQO_IN_TEST_FAILURE_HOLD_MIN_TESTS:-}" ]; then cmd+=("-Pcodiqo.testFailureHoldMinTests=${CODIQO_IN_TEST_FAILURE_HOLD_MIN_TESTS}"); fi
         cmd+=("-Pcodiqo.failOnJdtlsError=${CODIQO_IN_FAIL_ON_JDTLS_ERROR:-false}")
         cmd+=("-Pcodiqo.jdtUseSharedIndex=${CODIQO_IN_JDT_USE_SHARED_INDEX:-true}")
         cmd+=("-Pcodiqo.jdtIncludeDecompiledSources=${CODIQO_IN_JDT_INCLUDE_DECOMPILED_SOURCES:-false}")
@@ -389,8 +389,8 @@ for commit in "${commits[@]}"; do
     cmd+=("-Dcodiqo.llm.autoDiscoveryAgentInstructions=${CODIQO_IN_AGENT_INSTRUCTIONS:-true}")
     cmd+=("-Dcodiqo.skipOnBuildFailure=${CODIQO_IN_SKIP_ON_BUILD_FAILURE:-true}")
     cmd+=("-Dcodiqo.failOnUninstrumentedModule=${CODIQO_IN_FAIL_ON_UNINSTRUMENTED_MODULE:-true}")
-    if [ -n "${CODIQO_IN_TEST_FAILURE_HALT_SHARE:-}" ]; then cmd+=("-Dcodiqo.testFailureHaltShare=${CODIQO_IN_TEST_FAILURE_HALT_SHARE}"); fi
-    if [ -n "${CODIQO_IN_TEST_FAILURE_HALT_MIN_TESTS:-}" ]; then cmd+=("-Dcodiqo.testFailureHaltMinTests=${CODIQO_IN_TEST_FAILURE_HALT_MIN_TESTS}"); fi
+    if [ -n "${CODIQO_IN_TEST_FAILURE_HOLD_SHARE:-}" ]; then cmd+=("-Dcodiqo.testFailureHoldShare=${CODIQO_IN_TEST_FAILURE_HOLD_SHARE}"); fi
+    if [ -n "${CODIQO_IN_TEST_FAILURE_HOLD_MIN_TESTS:-}" ]; then cmd+=("-Dcodiqo.testFailureHoldMinTests=${CODIQO_IN_TEST_FAILURE_HOLD_MIN_TESTS}"); fi
     cmd+=("-Dcodiqo.failOnJdtlsError=${CODIQO_IN_FAIL_ON_JDTLS_ERROR:-false}")
     cmd+=("-Dcodiqo.ignoreComplexity=${CODIQO_IN_IGNORE_COMPLEXITY:-false}")
     cmd+=("-Dcodiqo.ignoreCpd=${CODIQO_IN_IGNORE_CPD:-false}")
