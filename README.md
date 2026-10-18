@@ -256,6 +256,8 @@ Maven and Gradle; see [Local review](#local-review) for what it costs and which 
 | --- | --- | --- |
 | `review` | `true` | Local mode (`-Dcodiqo.review`): review, assess and triage every analysed commit, scored from that assessment alone. Spends the organization's LLM budget through the Codiqo proxy, authenticated with `api-key`. |
 | `review-timeout-minutes` | `''` | Limit for one review (`-Dcodiqo.review.timeoutMinutes`). Empty uses the plugin default of 150. `per-commit-timeout` is raised to fit it plus 30 minutes. |
+| `review-temperature` | `''` | Sampling temperature of the review agents (`-Dcodiqo.review.temperature`), set on every model call. Empty uses the plugin default of 1.0. |
+| `review-top-p` | `''` | Nucleus-sampling cut-off of the review agents (`-Dcodiqo.review.topP`). Empty uses the plugin default of 0.95. |
 | `opencode-version` | `2.0.32` | Version of the OpenCode CLI (`@opencode/cli` on npm) installed for the review. |
 
 ### Analysis depth

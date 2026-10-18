@@ -325,6 +325,8 @@ for commit in "${commits[@]}"; do
             cmd+=("-Pcodiqo.review.executable=${CODIQO_OPENCODE_EXECUTABLE:?the OpenCode install step did not run}")
             cmd+=("-Pcodiqo.review.traceDirectory=$CODIQO_LOGS_DIR/review-trace")
             if [ -n "${CODIQO_REVIEW_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Pcodiqo.review.timeoutMinutes=${CODIQO_REVIEW_TIMEOUT_MINUTES}"); fi
+            if [ -n "${CODIQO_IN_REVIEW_TEMPERATURE:-}" ]; then cmd+=("-Pcodiqo.review.temperature=${CODIQO_IN_REVIEW_TEMPERATURE}"); fi
+            if [ -n "${CODIQO_IN_REVIEW_TOP_P:-}" ]; then cmd+=("-Pcodiqo.review.topP=${CODIQO_IN_REVIEW_TOP_P}"); fi
         else
             cmd+=("-Pcodiqo.review=false")
         fi
@@ -448,6 +450,8 @@ for commit in "${commits[@]}"; do
         # redacted and uploaded with them.
         cmd+=("-Dcodiqo.review.traceDirectory=$CODIQO_LOGS_DIR/review-trace")
         if [ -n "${CODIQO_REVIEW_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Dcodiqo.review.timeoutMinutes=${CODIQO_REVIEW_TIMEOUT_MINUTES}"); fi
+        if [ -n "${CODIQO_IN_REVIEW_TEMPERATURE:-}" ]; then cmd+=("-Dcodiqo.review.temperature=${CODIQO_IN_REVIEW_TEMPERATURE}"); fi
+        if [ -n "${CODIQO_IN_REVIEW_TOP_P:-}" ]; then cmd+=("-Dcodiqo.review.topP=${CODIQO_IN_REVIEW_TOP_P}"); fi
     else
         cmd+=("-Dcodiqo.review=false")
     fi

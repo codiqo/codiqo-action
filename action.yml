@@ -356,6 +356,14 @@ inputs:
     description: 'Limit for one review (-Dcodiqo.review.timeoutMinutes). Empty uses the plugin default of 150 minutes. The review runs inside per-commit-timeout, so with the review on that deadline is raised to at least this limit plus 30 minutes, with a warning. Only with review: true.'
     required: false
     default: ''
+  review-temperature:
+    description: 'Sampling temperature of the review agents (-Dcodiqo.review.temperature), set on every model call. Empty uses the plugin default of 1.0, the review models'' recommended value. Only with review: true.'
+    required: false
+    default: ''
+  review-top-p:
+    description: 'Nucleus-sampling cut-off of the review agents (-Dcodiqo.review.topP). Empty uses the plugin default of 0.95. Only with review: true.'
+    required: false
+    default: ''
   opencode-version:
     description: 'Version of the OpenCode CLI (npm package @opencode/cli) installed for the review. Needs npm on the runner. Only installed with review: true.'
     required: false
@@ -614,6 +622,8 @@ runs:
         CODIQO_IN_BUILD_ERROR_CAPTURE_LIMIT: ${{ inputs.build-error-capture-limit }}
         CODIQO_IN_MOVE_DETECTION: ${{ inputs.move-detection }}
         CODIQO_IN_MOVE_SIMILARITY_THRESHOLD: ${{ inputs.move-similarity-threshold }}
+        CODIQO_IN_REVIEW_TEMPERATURE: ${{ inputs.review-temperature }}
+        CODIQO_IN_REVIEW_TOP_P: ${{ inputs.review-top-p }}
         CODIQO_IN_MOVED_LINE_COEFFICIENT: ${{ inputs.moved-line-coefficient }}
         CODIQO_IN_DRIVER_SCORE_CAP_MULTIPLIER: ${{ inputs.driver-score-cap-multiplier }}
         CODIQO_IN_DRIVER_FACTOR_MAX_DEVIATION: ${{ inputs.driver-factor-max-deviation }}
