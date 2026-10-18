@@ -159,6 +159,12 @@ jobs:
           expect 3m     45 15m 'per-commit limit : 45m'
           expect 3m     1h off 'per-test limit   : 0m'
           expect 3m     1h  5m 'per-test limit   : 5m'
+          # with the review on, the deadline holds the plugin's default review limit and its follow-ups
+          floor="$(CODIQO_IN_REVIEW=true probe 3m 1h 15m)"
+          case "$floor" in
+            *'per-commit limit : 180m'*) ;;
+            *) echo "FAIL: a 1h deadline was not raised to hold a 150m review"; echo "$floor"; exit 1 ;;
+          esac
           # and invalid values must be rejected, not silently defaulted
           reject() {
             local out
