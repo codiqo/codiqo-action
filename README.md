@@ -142,7 +142,7 @@ on:
 - **A review that fails excludes the commit** (category `LOCAL_REVIEW_FAILURE`), so no later run
   pays for the review again. Deleting the analysis retries it.
 - **OpenCode is installed by the action**, from npm as `@opencode/cli` at `opencode-version`
-  (default `2.0.29`, the version the engine is validated with), into the runner tool cache, and is
+  (default `2.0.32`, the version the engine is validated with), into the runner tool cache, and is
   cached with `actions/cache` per runner OS, architecture and version. This needs `npm` on the
   runner: GitHub-hosted images have it; on a self-hosted runner add `actions/setup-node` first.
   The install is skipped when `review` is off or nothing is pending, and a failed install fails the
@@ -256,7 +256,7 @@ Maven and Gradle; see [Local review](#local-review) for what it costs and which 
 | --- | --- | --- |
 | `review` | `true` | Local mode (`-Dcodiqo.review`): review, assess and triage every analysed commit, scored from that assessment alone. Spends the organization's LLM budget through the Codiqo proxy, authenticated with `api-key`. |
 | `review-timeout-minutes` | `''` | Limit for one review (`-Dcodiqo.review.timeoutMinutes`). Empty uses the plugin default of 150. `per-commit-timeout` is raised to fit it plus 30 minutes. |
-| `opencode-version` | `2.0.29` | Version of the OpenCode CLI (`@opencode/cli` on npm) installed for the review. |
+| `opencode-version` | `2.0.32` | Version of the OpenCode CLI (`@opencode/cli` on npm) installed for the review. |
 
 ### Analysis depth
 
