@@ -320,6 +320,10 @@ inputs:
     description: 'Let the language server decompile dependency classes without sources. Slower, and rarely changes blast radius.'
     required: false
     default: 'false'
+  jdt-lombok-agent:
+    description: 'Attach lombok to the language server so call hierarchy resolves the members lombok generates. Turn off for a project that does not use lombok: the agent also widens every caller lookup, which costs time and can reach a JDT failure.'
+    required: false
+    default: 'true'
   jdt-source-exclusions:
     description: 'Comma-separated groupId prefixes whose -sources.jar is removed from the local repository before the language server imports the project (-Dcodiqo.jdtSourceExclusions). REPLACES the default list rather than adding to it. The default covers the Scala and Kotlin dependency families whose source jars hang or crash the import; extend it (repeating the defaults you still want) if a dependency of yours ships non-Java sources and the import stalls.'
     required: false
@@ -630,6 +634,7 @@ runs:
         CODIQO_IN_DRIVER_SCORE_CAP_DRY_RUN: ${{ inputs.driver-score-cap-dry-run }}
         CODIQO_IN_JDT_USE_SHARED_INDEX: ${{ inputs.jdt-use-shared-index }}
         CODIQO_IN_JDT_INCLUDE_DECOMPILED_SOURCES: ${{ inputs.jdt-include-decompiled-sources }}
+        CODIQO_IN_JDT_LOMBOK_AGENT: ${{ inputs.jdt-lombok-agent }}
         CODIQO_IN_JDT_SOURCE_EXCLUSIONS: ${{ inputs.jdt-source-exclusions }}
         CODIQO_IN_MAX_REQUESTS: ${{ inputs.max-requests }}
         CODIQO_IN_MAX_REQUESTS_PER_HOST: ${{ inputs.max-requests-per-host }}

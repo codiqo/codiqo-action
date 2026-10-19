@@ -281,6 +281,7 @@ analysis cost against detail; none of them changes how effort is scored except w
 | `build-error-capture-limit` | `''` | Maximum characters of build output captured into a build-failure report. |
 | `jdt-use-shared-index` | `true` | Reuse the shared language-server index across runs. Much faster; turn off to force a clean index. |
 | `jdt-include-decompiled-sources` | `false` | Let the language server decompile dependency classes without sources. Slower, and rarely changes blast radius. |
+| `jdt-lombok-agent` | `true` | Attach lombok to the language server so call hierarchy resolves the members lombok generates. Turn off for a project that does not use lombok: the agent also widens every caller lookup, which costs time and can reach a JDT failure. |
 | `jdt-source-exclusions` | `''` | Comma-separated groupId prefixes whose `-sources.jar` is removed before the language server imports. **Replaces** the default list, which covers the Scala and Kotlin families whose source jars stall the import. Extend it if a dependency of yours ships non-Java sources and the import hangs. |
 | `lsp-query-timeout-seconds` | `''` | Timeout for a single language-server query, such as a call-hierarchy lookup. |
 | `max-requests` | `''` | Maximum concurrent HTTP requests the engine issues. |
