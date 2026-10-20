@@ -493,18 +493,6 @@ runs:
         CODIQO_IN_MAVEN_VERSION: ${{ inputs.maven-version }}
 
     #
-    # The language server archive is fetched once and reused, so caching it removes a download
-    # from every run. Small and immutable, unlike the language server's own index.
-    #
-    - name: Cache the Codiqo language server download
-      uses: actions/cache@v6
-      with:
-        path: ~/.cache/fetch
-        key: codiqo-fetch-${{ runner.os }}-${{ inputs.codiqo-version }}-${{ inputs.jdtls-version }}
-        restore-keys: |
-          codiqo-fetch-${{ runner.os }}-
-
-    #
     # Must run after setup-java, which writes its own ~/.m2/settings.xml when given a server-id.
     #
     - name: Configure Maven settings
@@ -556,6 +544,23 @@ runs:
         CODIQO_IN_INDEX_REF: ${{ inputs.index-ref }}
         CODIQO_IN_API_CONNECT_TIMEOUT: ${{ inputs.api-connect-timeout-seconds }}
         CODIQO_IN_API_READ_TIMEOUT: ${{ inputs.api-read-timeout-seconds }}
+        CODIQO_IN_JDTLS_VERSION: ${{ inputs.jdtls-version }}
+        CODIQO_IN_JDTLS_USE_SNAPSHOT: ${{ inputs.jdtls-use-snapshot }}
+
+    #
+    # The language server archive is fetched once and reused, so caching it removes a download from every
+    # run. Small and immutable, unlike the language server's own index. Restored after indexing because
+    # the key carries the version the plugin resolved there — the input when pinned, the plugin's own
+    # default otherwise — so a plugin that moves its default earns a fresh entry instead of re-downloading
+    # under the stale hit key on every run. Indexing itself downloads nothing into ~/.cache/fetch.
+    #
+    - name: Cache the Codiqo language server download
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/fetch
+        key: codiqo-fetch-${{ runner.os }}-${{ inputs.codiqo-version }}-${{ steps.index.outputs.resolved-jdtls-version || inputs.jdtls-version || 'default' }}
+        restore-keys: |
+          codiqo-fetch-${{ runner.os }}-
 
     #
     # Skipped when nothing is pending, so a quiet repository costs no resolution round-trip.

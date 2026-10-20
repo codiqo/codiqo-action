@@ -28,6 +28,10 @@ if [ "${CODIQO_BUILD_TOOL:-maven}" = "gradle" ]; then
     cmd+=("-Pcodiqo.commitWindow=${CODIQO_COMMIT_WINDOW}")
     cmd+=("-Pcodiqo.firstParentOnly=${CODIQO_IN_FIRST_PARENT_ONLY:-true}")
     cmd+=("-Pcodiqo.indexOutputFile=${CODIQO_MISSING_FILE}")
+    cmd+=("-Pcodiqo.indexMetadataFile=${CODIQO_METADATA_FILE}")
+
+    if [ -n "${CODIQO_IN_JDTLS_VERSION:-}" ]; then cmd+=("-Pcodiqo.jdtlsVersion=${CODIQO_IN_JDTLS_VERSION}"); fi
+    if [ "${CODIQO_IN_JDTLS_USE_SNAPSHOT:-false}" = "true" ]; then cmd+=("-Pcodiqo.jdtlsUseSnapshot=true"); fi
 
     if [ -n "${CODIQO_IN_API_URL:-}" ]; then cmd+=("-Pcodiqo.apiUrl=${CODIQO_IN_API_URL}"); fi
     if [ -n "${CODIQO_BRANCH:-}" ]; then cmd+=("-Pcodiqo.branch=${CODIQO_BRANCH}"); fi
@@ -55,6 +59,10 @@ else
     cmd+=("-Dcodiqo.commitWindow=${CODIQO_COMMIT_WINDOW}")
     cmd+=("-Dcodiqo.firstParentOnly=${CODIQO_IN_FIRST_PARENT_ONLY:-true}")
     cmd+=("-Dcodiqo.missingAnalysesOutputFile=${CODIQO_MISSING_FILE}")
+    cmd+=("-Dcodiqo.indexMetadataFile=${CODIQO_METADATA_FILE}")
+
+    if [ -n "${CODIQO_IN_JDTLS_VERSION:-}" ]; then cmd+=("-Dcodiqo.jdtlsVersion=${CODIQO_IN_JDTLS_VERSION}"); fi
+    if [ "${CODIQO_IN_JDTLS_USE_SNAPSHOT:-false}" = "true" ]; then cmd+=("-Dcodiqo.jdtlsUseSnapshot=true"); fi
 
     if [ -n "${CODIQO_IN_API_URL:-}" ]; then cmd+=("-Dcodiqo.apiUrl=${CODIQO_IN_API_URL}"); fi
     if [ -n "${CODIQO_BRANCH:-}" ]; then cmd+=("-Dcodiqo.branch=${CODIQO_BRANCH}"); fi
@@ -98,6 +106,18 @@ fi
 
 codiqo::output "missing-count" "$missing_count"
 codiqo::output "missing-file" "$CODIQO_MISSING_FILE"
+
+#
+# The plugin reports the language-server version the analysis will use, so the download cache can be
+# keyed on the version itself rather than on the jdtls-version input alone: with the input unset every
+# plugin default change would otherwise leave the stale archive in the cache and download the new one
+# on every ephemeral runner. An old plugin writes no file, and the action then falls back to the input.
+#
+resolved_jdtls_version=""
+if [ -f "$CODIQO_METADATA_FILE" ]; then
+    resolved_jdtls_version=$(grep -E '^jdtlsVersion=[A-Za-z0-9._-]+$' "$CODIQO_METADATA_FILE" | tail -1 | cut -d= -f2-)
+fi
+codiqo::output "resolved-jdtls-version" "$resolved_jdtls_version"
 
 if [ "$missing_count" -eq 0 ]; then
     codiqo::log "no commits require analysis."

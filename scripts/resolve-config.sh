@@ -376,6 +376,7 @@ codiqo::export CODIQO_BUILD_CMD "$build_command"
 codiqo::export CODIQO_HEARTBEAT_INTERVAL "${CODIQO_IN_HEARTBEAT_INTERVAL:-30}"
 codiqo::export CODIQO_TAIL_LINES "${CODIQO_IN_TAIL_LINES:-400}"
 codiqo::export CODIQO_MISSING_FILE "$CODIQO_WORK_DIR/missing-analyses.txt"
+codiqo::export CODIQO_METADATA_FILE "$CODIQO_WORK_DIR/index-metadata.properties"
 
 if [ -n "${CODIQO_IN_MAVEN_OPTS:-}" ]; then
     codiqo::export MAVEN_OPTS "${CODIQO_IN_MAVEN_OPTS}"

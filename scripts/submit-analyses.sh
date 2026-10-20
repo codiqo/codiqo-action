@@ -35,6 +35,25 @@ fi
 
 plugin="io.codiqo:codiqo-maven-plugin:${CODIQO_IN_VERSION}"
 codiqo::read_lines_into extra_args "$CODIQO_WORK_DIR/build-args"
+
+#
+# The download cache is restored under the key of the version indexed for this run. A restored entry
+# from an older key can carry last run's language-server archive, which the plugin would ignore and the
+# cache would then keep re-saving under the new key — ~100 MB a runner keeps restoring for nothing.
+#
+resolved_jdtls_version=""
+if [ -f "$CODIQO_METADATA_FILE" ]; then
+    resolved_jdtls_version=$(grep -E '^jdtlsVersion=[A-Za-z0-9._-]+$' "$CODIQO_METADATA_FILE" | tail -1 | cut -d= -f2-)
+fi
+if [ -n "$resolved_jdtls_version" ] && [ -d "$HOME/.cache/fetch" ]; then
+    for archive in "$HOME"/.cache/fetch/jdt-language-server-*.tar.gz; do
+        [ -e "$archive" ] || continue
+        case "$(basename "$archive")" in
+            "jdt-language-server-${resolved_jdtls_version}-"*.tar.gz) ;;
+            *) codiqo::log "dropping stale language-server archive from the download cache: $(basename "$archive")"; rm -f "$archive" ;;
+        esac
+    done
+fi
 codiqo::read_lines_into user_props "$CODIQO_WORK_DIR/build-props"
 
 #

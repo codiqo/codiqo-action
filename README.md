@@ -147,6 +147,9 @@ on:
   runner: GitHub-hosted images have it; on a self-hosted runner add `actions/setup-node` first.
   The install is skipped when `review` is off or nothing is pending, and a failed install fails the
   run with the reason.
+- **The language-server download is cached** under `~/.cache/fetch`, keyed by the JDT LS version the
+  index step resolves — `jdtls-version` when pinned, the plugin's own default otherwise, so a plugin
+  that moves its default gets a fresh cache entry instead of a per-run download on ephemeral runners.
 
 ## Inputs
 
