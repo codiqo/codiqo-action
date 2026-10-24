@@ -34,6 +34,7 @@ if [ "$total" -eq 0 ]; then
 fi
 
 plugin="io.codiqo:codiqo-maven-plugin:${CODIQO_IN_VERSION}"
+extra_args=()
 codiqo::read_lines_into extra_args "$CODIQO_WORK_DIR/build-args"
 
 #
@@ -54,6 +55,7 @@ if [ -n "$resolved_jdtls_version" ] && [ -d "$HOME/.cache/fetch" ]; then
         esac
     done
 fi
+user_props=()
 codiqo::read_lines_into user_props "$CODIQO_WORK_DIR/build-props"
 
 #

@@ -12,7 +12,9 @@ set -euo pipefail
 # shellcheck source=scripts/lib.sh
 . "$GITHUB_ACTION_PATH/scripts/lib.sh"
 
+extra_args=()
 codiqo::read_lines_into extra_args "$CODIQO_WORK_DIR/build-args"
+user_props=()
 codiqo::read_lines_into user_props "$CODIQO_WORK_DIR/build-props"
 
 cmd=("$CODIQO_BUILD_CMD" -B -ntp -e -U)

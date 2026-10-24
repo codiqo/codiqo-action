@@ -33,7 +33,9 @@ codiqo::export() {
 #
 # Read a file of one-per-line values into the named array. Blank lines and lines whose
 # first non-space character is '#' are skipped. A missing file yields an empty array
-# rather than an error, so callers need no existence check.
+# rather than an error, so callers need no existence check. Callers still declare the
+# array first (name=()): the eval below assigns it out of the linter's sight, and from
+# version 0.11 (ubuntu-26.04 runners) ShellCheck reports every later use as unassigned (SC2154).
 #
 codiqo::read_lines_into() {
     local target="$1" file="$2" line
