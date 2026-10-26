@@ -2,18 +2,26 @@
 #
 # Prerequisites:
 #   1. A Maven project.
-#   2. A repository secret named CODIQO_API_KEY (get a key at https://app.codiqo.io).
+#   2. A secret named CODIQO_API_KEY (get a key at https://codiqo.io): a repository secret, or an
+#      organization secret granted to this repository.
 name: Codiqo
 
 on:
-  # A schedule rather than a push trigger: analysing a commit means building it, which takes
-  # minutes, so decoupling from pushes keeps the queue orderly and catches up on its own.
+  # Each push to the default branch is analysed as it lands. Not pull_request: that run checks out
+  # GitHub's temporary merge commit, which never lands on a branch, and a fork's gets no secrets.
+  push:
+    branches: [main]
+  # A safety run for anything a push run missed. Give each repository its own minute: many starting
+  # at minute 0 queue together on the review's rate limit.
   schedule:
-    - cron: '0 * * * *'
+    - cron: '23 4,16 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 # One analysis at a time. cancel-in-progress: false lets the running one finish and makes the
-# newcomer wait, rather than killing an hour of build work.
+# newcomer wait, rather than killing an hour of build work or building the same commits twice.
 concurrency:
   group: codiqo
   cancel-in-progress: false
@@ -30,7 +38,7 @@ jobs:
       - uses: codiqo/codiqo-action@main
         with:
           api-key: ${{ secrets.CODIQO_API_KEY }}
-          java-version: '25'   # 25 or newer, and able to build your project
+          java-version: '21'   # 21 or newer, and able to build your project
           # One Maven thread per runner core for the per-commit build. Lower it, or remove it to build
           # serially, if a commit dies with exit 137: each concurrently built module may fork a test JVM.
           maven-parallelism: '1C'

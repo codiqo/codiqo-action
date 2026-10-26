@@ -1,12 +1,20 @@
 # Codiqo — measure the engineering effort behind your commits.
 # Docs: https://github.com/codiqo/codiqo-action
-# Setup: add a repository secret CODIQO_API_KEY (get a key at https://app.codiqo.io).
+# Setup: add a secret CODIQO_API_KEY (get a key at https://codiqo.io), as a repository secret or an
+# organization secret granted to this repository.
 name: Codiqo
 
 on:
+  push:
+    branches: [ $default-branch ]
+  # A safety run for anything a push run missed. Change the minute per repository: many starting at
+  # minute 0 queue together on the review's rate limit.
   schedule:
-    - cron: '0 * * * *'
+    - cron: '23 4,16 * * *'
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: codiqo
@@ -24,5 +32,5 @@ jobs:
       - uses: codiqo/codiqo-action@main
         with:
           api-key: ${{ secrets.CODIQO_API_KEY }}
-          java-version: '25'
+          java-version: '21'
           maven-parallelism: '1C'

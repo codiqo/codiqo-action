@@ -165,6 +165,25 @@ jobs:
             *'per-commit limit : 180m'*) ;;
             *) echo "FAIL: a 1h deadline was not raised to hold a 150m review"; echo "$floor"; exit 1 ;;
           esac
+          # left empty, the deadline follows the review without a warning, and is an hour without it
+          auto="$(CODIQO_IN_REVIEW=true probe 3m '' 15m)"
+          case "$auto" in
+            *'::warning::per-commit-timeout'*) echo "FAIL: the default deadline warned about itself"; echo "$auto"; exit 1 ;;
+            *'per-commit limit : 180m'*) ;;
+            *) echo "FAIL: an empty deadline did not hold the 150m review"; echo "$auto"; exit 1 ;;
+          esac
+          auto="$(CODIQO_IN_REVIEW=true CODIQO_IN_REVIEW_TIMEOUT_MINUTES=60 probe 3m '' 15m)"
+          case "$auto" in
+            *'per-commit limit : 90m'*) ;;
+            *) echo "FAIL: an empty deadline did not follow review-timeout-minutes"; echo "$auto"; exit 1 ;;
+          esac
+          expect 3m     '' 15m 'per-commit limit : 60m'
+          # a secret that never reached the workflow stops the run before anything is installed
+          nokey="$(CODIQO_IN_HAS_API_KEY=false probe 3m 1h 15m)"
+          case "$nokey" in
+            *'::error::api-key is empty'*) ;;
+            *) echo "FAIL: an empty api-key was not rejected"; echo "$nokey"; exit 1 ;;
+          esac
           # and invalid values must be rejected, not silently defaulted
           reject() {
             local out

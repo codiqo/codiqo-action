@@ -9,6 +9,17 @@ set -euo pipefail
 
 mkdir -p "$CODIQO_WORK_DIR" "$CODIQO_LOGS_DIR"
 
+# ------------------------------------------------------------------------------- credentials
+
+#
+# A secret that does not reach the workflow arrives as an empty string, not as a missing input, so
+# GitHub never enforces `required`. Left to the plugin, it fails after the JDK and Maven are set up
+# and advises a browser login, which a runner cannot do. The usual causes are all on the GitHub side.
+#
+if [ "${CODIQO_IN_HAS_API_KEY:-true}" = "false" ]; then
+    codiqo::die "api-key is empty. Add your Codiqo API key as a secret named CODIQO_API_KEY and pass api-key: \${{ secrets.CODIQO_API_KEY }}. An organization secret must also grant this repository access, and a workflow run for a pull request from a fork receives no secrets."
+fi
+
 # ---------------------------------------------------------------- repository preconditions
 
 #
@@ -69,10 +80,14 @@ codiqo::_require_minutes() {
     CODIQO_MINUTES="$1"
 }
 
+#
+# Empty is left empty here: its value depends on the review, resolved just below.
+#
 per_commit_raw="${CODIQO_IN_PER_COMMIT_TIMEOUT:-}"
-case "${per_commit_raw:-1h}" in
+case "$per_commit_raw" in
+    '') per_commit_minutes="" ;;
     30m) per_commit_minutes=30 ;;
-    1h | '') per_commit_minutes=60 ;;
+    1h) per_commit_minutes=60 ;;
     90m) per_commit_minutes=90 ;;
     2h) per_commit_minutes=120 ;;
     *)
@@ -85,8 +100,9 @@ esac
 # The local review runs beside the build inside this deadline, and its labelling and triage follow-ups
 # run after the build. A deadline the review cannot fit kills the whole analysis instead of letting the
 # review time out on its own, and stop-on-first-failure then ends the run, so with the review on the
-# deadline is raised to the review's limit plus a margin. The plugin's review default is 150 minutes
-# since its coordinator may take 128 steps and its reviewers 256; the caller workflows still pass 1h,
+# deadline is the review's limit plus a margin: an empty per-commit-timeout takes it silently, and a
+# smaller explicit value is raised to it with a warning. The plugin's review default is 150 minutes
+# since its coordinator may take 128 steps and its reviewers 256; some caller workflows still pass 1h,
 # so the floor has to live here. The margin holds the follow-ups, one answer turn each.
 #
 REVIEW_PLUGIN_DEFAULT_MINUTES=150
@@ -97,13 +113,17 @@ if [ "${CODIQO_IN_REVIEW:-false}" = "true" ]; then
         '' | *[!0-9]*) ;; # validated with the other review settings below
         *)
             review_floor=$(( review_limit_raw + REVIEW_MARGIN_MINUTES ))
-            if [ "$per_commit_minutes" -lt "$review_floor" ]; then
+            if [ -z "$per_commit_minutes" ]; then
+                per_commit_minutes="$review_floor"
+            elif [ "$per_commit_minutes" -lt "$review_floor" ]; then
                 codiqo::warn "per-commit-timeout ${per_commit_minutes}m cannot hold a ${review_limit_raw}m review and its follow-ups; using ${review_floor}m."
                 per_commit_minutes="$review_floor"
             fi
             ;;
     esac
 fi
+# Without the review there is nothing to hold, and an hour is the long-standing default.
+per_commit_minutes="${per_commit_minutes:-60}"
 
 case "${CODIQO_IN_PER_TEST_TIMEOUT:-15m}" in
     off | 0) per_test_minutes=0 ;;

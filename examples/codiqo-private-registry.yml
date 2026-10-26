@@ -7,9 +7,15 @@
 name: Codiqo
 
 on:
+  # Triggers, permissions and concurrency as in examples/codiqo.yml.
+  push:
+    branches: [main]
   schedule:
-    - cron: '0 * * * *'
+    - cron: '23 4,16 * * *'
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: codiqo
@@ -33,7 +39,7 @@ jobs:
       - uses: codiqo/codiqo-action@main
         with:
           api-key: ${{ secrets.CODIQO_API_KEY }}
-          java-version: '25'
+          java-version: '21'
           maven-parallelism: '1C'
 
           # Properties your POMs interpolate. These reach the host Maven; the profile below is

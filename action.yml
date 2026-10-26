@@ -117,9 +117,9 @@ inputs:
 
   # ------------------------------------------------------------------------------------ timeouts
   per-commit-timeout:
-    description: 'Wall-clock limit for analysing one commit before it is killed, enforced from outside the JVM. This is the outer deadline the build and test budgets are fitted under, so raising or lowering it moves them with it.'
+    description: 'Wall-clock limit for analysing one commit before it is killed, enforced from outside the JVM. This is the outer deadline the build and test budgets are fitted under, so raising or lowering it moves them with it. Empty is the review limit plus 30 minutes with review on (180 by default) and 1h with it off; with review on, a smaller value is raised to that, with a warning.'
     required: false
-    default: '1h'
+    default: ''
   build-timeout-minutes:
     description: 'Limit for the forked build of a single commit (-Dcodiqo.buildTimeoutMinutes). It has to fire before per-commit-timeout, or the outer deadline kills the analysis before codiqo can record the commit as a build failure. Left empty it is three quarters of per-commit-timeout; a value that would not fit is clamped back to that, with a warning.'
     required: false
@@ -436,14 +436,17 @@ runs:
   steps:
     #
     # Everything is validated and normalised once, here, so the later steps are straight-line.
-    # This is also where a shallow clone is rejected — before an hour of build time is spent on
-    # a run that would have silently analysed nothing.
+    # This is also where a missing API key and a shallow clone are rejected — before the JDK is
+    # installed for a run that cannot submit, or an hour of build time is spent on one that would
+    # have silently analysed nothing.
     #
     - name: Resolve Codiqo configuration
       id: cfg
       shell: bash
       run: "$GITHUB_ACTION_PATH/scripts/resolve-config.sh"
       env:
+        # Whether a key arrived, not the key: this step has no use for its value.
+        CODIQO_IN_HAS_API_KEY: ${{ inputs.api-key != '' }}
         CODIQO_IN_VERSION: ${{ inputs.codiqo-version }}
         CODIQO_IN_API_URL: ${{ inputs.api-url }}
         CODIQO_IN_BRANCH: ${{ inputs.branch }}

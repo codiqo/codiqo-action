@@ -9,16 +9,21 @@ rather than a count of diff lines.
 
 ## Quick start
 
-Add your API key as a repository secret named `CODIQO_API_KEY`, then add
-`.github/workflows/codiqo.yml`:
+Add your API key as a secret named `CODIQO_API_KEY` — a repository secret, or an organization secret
+granted to this repository — then add `.github/workflows/codiqo.yml`:
 
 ```yaml
 name: Codiqo
 
 on:
+  push:
+    branches: [main]              # your default branch
   schedule:
-    - cron: '0 * * * *'
+    - cron: '23 4,16 * * *'       # a safety run; give each repository its own minute
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: codiqo
@@ -36,12 +41,29 @@ jobs:
       - uses: codiqo/codiqo-action@main
         with:
           api-key: ${{ secrets.CODIQO_API_KEY }}
+          java-version: '21'      # 21 or newer, and able to build your project
           # One Maven thread per runner core for the per-commit build. Lower it, or remove it to build
           # serially, if a commit dies with exit 137: each concurrently built module may fork a test JVM.
           maven-parallelism: '1C'
 ```
 
-The action is incremental: commits already scored are skipped, so a schedule simply catches up.
+The action is incremental: commits already scored are skipped, so each push analyses what it
+brought and the schedule picks up anything a push run missed. The rest of the workflow is
+deliberate:
+
+- **Pushes to the default branch, not `pull_request`.** A pull request run checks out GitHub's
+  temporary merge commit, which never lands on a branch, and a pull request from a fork receives no
+  secrets.
+- **One run at a time.** `cancel-in-progress: false` lets a running analysis finish and queues the
+  next one behind it, rather than killing an hour of build work or having two runs build and
+  review the same pending commits.
+- **A schedule off the hour.** Many repositories starting at minute 0 queue together on the
+  review's rate limit, and minute 0 is also when GitHub's schedules are busiest.
+
+Before the first scheduled run, prove the wiring once with
+[`examples/codiqo-first-run.yml`](examples/codiqo-first-run.yml): two commits and no tests. Each
+analysis should then show a non-zero caller count in Codiqo; zero means the language server never
+built a Java model (see Troubleshooting).
 
 ## Requirements
 
@@ -60,6 +82,34 @@ The action is incremental: commits already scored are skipped, so a schedule sim
 - **Time.** Each commit runs a full `clean verify`. Give the job a generous `timeout-minutes`, cap
   the first run with `max-commits-per-run`, and consider `ignore-coverage: true` while trialling
   (under Gradle, pair it with `gradle-tasks: ''` — see the Gradle section).
+- **Memory.** The analysis JVM, the language server and the forked build run side by side. With no
+  `-Xmx` in `maven-opts` (or the job's `MAVEN_OPTS`) the analysis gets a quarter of the runner's
+  memory, and the action warns about it. GitHub's standard runner for private repositories is
+  smaller than the one public repositories get, so a large reactor may need a larger or
+  self-hosted runner; exit 137 on a commit is the usual sign.
+
+## Rolling out across an organization
+
+Everything above is per repository. For a team adding many repositories at once:
+
+- **One organization secret.** Add `CODIQO_API_KEY` once under the organization's Actions secrets
+  and grant it to the repositories you analyse. A repository it is not granted to receives an empty
+  value, and the action stops at its first step saying so.
+- **Allow the actions it uses.** If your organization restricts which actions may run, allow
+  `codiqo/codiqo-action` and the actions it calls: `actions/setup-java`, `actions/cache` and
+  `actions/upload-artifact`, plus `actions/checkout` from the workflow itself (and
+  `actions/setup-node` if a self-hosted runner lacks the `npm` the review needs).
+- **Offer the workflow from your own organization.** Copy [`starter-workflow/codiqo.yml`](starter-workflow/codiqo.yml)
+  and [`codiqo.properties.json`](starter-workflow/codiqo.properties.json) into your organization's
+  `.github` repository under `workflow-templates/`, and every Maven repository offers Codiqo under
+  **Actions → New workflow**.
+- **Stagger the schedules.** Give each repository its own cron minute and hour, so their safety runs
+  do not queue together on the review's rate limit.
+- **Start small.** A repository's first run backfills `commit-window` (three months by default) with
+  one paid review per commit. Prove the wiring on one repository first, then add the rest a few at a
+  time, with `commit-window: 1m` where three months of history is not worth reviewing.
+- **Pin the ref your policy requires.** See [Versioning](#versioning): `@main` moves with every
+  push to this repository; an organization that requires pinned actions uses `@<sha>`.
 
 ## Gradle
 
@@ -113,12 +163,7 @@ commit from that assessment alone. The server has no prompt of its own, so with 
 every commit is excluded. There are no other review switches. It works with Maven and Gradle.
 
 ```yaml
-on:
-  push:
-    branches: [main]
-  pull_request:
-
-# ... checkout with fetch-depth: 0, as in the quick start ...
+# ... the quick start workflow; the review needs nothing beyond api-key ...
 
       - uses: codiqo/codiqo-action@main
         with:
@@ -135,8 +180,8 @@ on:
   a workflow file, say) logs `local review skipped` and costs nothing.
 - **It takes time.** A review can take several minutes, and up to `review-timeout-minutes` (150 by
   default). It runs beside the build but is awaited before scoring, so it must fit inside
-  `per-commit-timeout`: with the review on, that deadline is raised to at least the review limit plus
-  30 minutes (180 by default), with a warning. Being on by default, it also reviews every commit a scheduled catch-up or a
+  `per-commit-timeout`: left empty, that deadline is the review limit plus 30 minutes (180 by
+  default), and a smaller value is raised to it with a warning. Being on by default, it also reviews every commit a scheduled catch-up or a
   first run with a long `commit-window` backfills; shorten `commit-window` if that backlog is not
   worth a review per commit.
 - **A review that fails excludes the commit** (category `LOCAL_REVIEW_FAILURE`), so no later run
@@ -199,7 +244,7 @@ on:
 
 | Input | Default | Description |
 | --- | --- | --- |
-| `per-commit-timeout` | `1h` | `30m`, `1h`, `90m`, `2h`, or raw minutes. The outer deadline everything else is fitted under. With `review` on it is raised to at least `review-timeout-minutes` plus 30 (180 by default). |
+| `per-commit-timeout` | `''` | `30m`, `1h`, `90m`, `2h`, or raw minutes. The outer deadline everything else is fitted under. Empty is `review-timeout-minutes` plus 30 with `review` on (180 by default) and `1h` with it off; with `review` on, a smaller value is raised to that, with a warning. |
 | `build-timeout-minutes` | `45` | Forked build of one commit. Three quarters of `per-commit-timeout`; a larger value is clamped back to that with a warning. |
 | `test-timeout-minutes` | `30` | Test phase of the forked build. Clamped to three quarters of the build timeout. |
 | `per-test-timeout` | `15m` | One JUnit 5 test method; `off` disables. Capped at 15 minutes and at half the test-phase budget. |
@@ -432,6 +477,7 @@ you want it.
 | Symptom | Cause |
 | --- | --- |
 | **Zero callers, external impact "none"** | `settings.xml` is not at `~/.m2/settings.xml`, or m2e cannot resolve your parent POMs. See the four details above. |
+| `api-key is empty` | The secret never reached the workflow: it is misnamed, an organization secret not granted to this repository, or the run is for a pull request from a fork, which receives no secrets. |
 | `repository has incomplete history` | Add `fetch-depth: 0` to `actions/checkout`. |
 | `0 commits require analysis`, unexpectedly | Widen `commit-window`, check `exclude-author-emails`, confirm full history. |
 | **Plugin or `codiqo-maven-time-machine` will not resolve** | The version is not in your repositories. Check `codiqo-version`; note that a catch-all `<mirrorOf>` swallows the snapshot repository — exclude it with `<mirrorOf>external:*,!central-snapshots</mirrorOf>`. |

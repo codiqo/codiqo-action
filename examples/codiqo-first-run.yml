@@ -4,17 +4,20 @@
 #   - ignore-coverage skips tests in the per-commit build, so no coverage data is produced
 #   - max-commits-per-run caps the backlog to a couple of commits
 #
-# Once a run comes back with a non-zero caller count, drop both and switch to the schedule in
+# Once the analyses show a non-zero caller count in Codiqo, drop both and switch to
 # examples/codiqo.yml.
 name: Codiqo (first run)
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   analyze:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v7
         with:
@@ -24,11 +27,10 @@ jobs:
         uses: codiqo/codiqo-action@main
         with:
           api-key: ${{ secrets.CODIQO_API_KEY }}
-          java-version: '25'
+          java-version: '21'
           commit-window: 'P7D'
           max-commits-per-run: 2
           ignore-coverage: true
-          per-commit-timeout: '90m'
           maven-parallelism: '1C'
 
       # The number that matters. A completed analysis reporting zero callers means the language
