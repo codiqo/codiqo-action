@@ -122,8 +122,9 @@ if [ "${CODIQO_IN_REVIEW:-false}" = "true" ]; then
             ;;
     esac
 fi
-# Without the review there is nothing to hold, and an hour is the long-standing default.
-per_commit_minutes="${per_commit_minutes:-60}"
+# Without the review the deadline only has to hold the build: two hours fits build-timeout-minutes'
+# default of 90 under the three-quarters rule below, so the defaults never clamp each other.
+per_commit_minutes="${per_commit_minutes:-120}"
 
 case "${CODIQO_IN_PER_TEST_TIMEOUT:-15m}" in
     off | 0) per_test_minutes=0 ;;
@@ -398,16 +399,24 @@ codiqo::export CODIQO_TAIL_LINES "${CODIQO_IN_TAIL_LINES:-400}"
 codiqo::export CODIQO_MISSING_FILE "$CODIQO_WORK_DIR/missing-analyses.txt"
 codiqo::export CODIQO_METADATA_FILE "$CODIQO_WORK_DIR/index-metadata.properties"
 
-if [ -n "${CODIQO_IN_MAVEN_OPTS:-}" ]; then
-    codiqo::export MAVEN_OPTS "${CODIQO_IN_MAVEN_OPTS}"
-fi
-
+#
 # Maven runs the analysis in its own JVM, so an unsized heap is a quarter of the runner's RAM: enough
 # for most projects, and a silent OutOfMemoryError in copy-paste detection or diagnostics for a large
-# one, which then fails every scheduled run on the same commit.
+# one, which then fails every scheduled run on the same commit. Half is what the largest projects
+# analysed so far needed, on 16 GB and 31 GB runners alike; three quarters let the analysis, the
+# language server and the forked build together exhaust the runner, which is then lost rather than
+# one JVM failing. A percentage rather than an -Xmx follows the runner's size, container limits
+# included, and any -Xmx the project sets (here or in .mvn/jvm.config) still takes precedence.
+#
+DEFAULT_HEAP_OPTS="-XX:MaxRAMPercentage=50"
 effective_maven_opts="${CODIQO_IN_MAVEN_OPTS:-${MAVEN_OPTS:-}}"
-if [ "$build_tool" = "maven" ] && ! printf '%s' "$effective_maven_opts" | grep -qE -- '-Xmx|MaxRAMPercentage|MaxRAM='; then
-    codiqo::warn "MAVEN_OPTS sets no heap limit, so the analysis JVM gets a quarter of this runner's memory. A large project can run out of it; set -Xmx through maven-opts or the job's MAVEN_OPTS."
+heap_limit="as set in MAVEN_OPTS"
+if [ "$build_tool" = "maven" ] && ! printf '%s' "$effective_maven_opts" | grep -qE -- '-Xmx|MaxHeapSize|MaxRAMPercentage|MaxRAM='; then
+    effective_maven_opts="${effective_maven_opts:+$effective_maven_opts }$DEFAULT_HEAP_OPTS"
+    heap_limit="$DEFAULT_HEAP_OPTS (the default: half this runner's memory)"
+fi
+if [ "$effective_maven_opts" != "${MAVEN_OPTS:-}" ]; then
+    codiqo::export MAVEN_OPTS "$effective_maven_opts"
 fi
 
 codiqo::group "resolved codiqo configuration"
@@ -422,6 +431,9 @@ codiqo::log "build limit      : ${build_timeout_minutes}m"
 codiqo::log "test limit       : ${test_timeout_minutes}m"
 codiqo::log "per-test limit   : ${per_test_minutes}m (0 = disabled)"
 codiqo::log "local review     : $review"
+if [ "$build_tool" = "maven" ]; then
+    codiqo::log "maven heap       : $heap_limit"
+fi
 codiqo::log "extra args       : $(wc -l < "$args_file" | tr -d ' ') line(s)"
 codiqo::log "user properties  : $(wc -l < "$props_file" | tr -d ' ') line(s)"
 codiqo::endgroup
