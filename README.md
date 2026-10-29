@@ -188,7 +188,7 @@ every commit is excluded. There are no other review switches. It works with Mave
 - **A review that fails excludes the commit** (category `LOCAL_REVIEW_FAILURE`), so no later run
   pays for the review again. Deleting the analysis retries it.
 - **OpenCode is installed by the action**, from npm as `@opencode/cli` at `opencode-version`
-  (default `2.1.4`, the version the engine is validated with), into the runner tool cache, and is
+  (default `2.2.2`, the version the engine is validated with), into the runner tool cache, and is
   cached with `actions/cache` per runner OS, architecture and version. This needs `npm` on the
   runner: GitHub-hosted images have it; on a self-hosted runner add `actions/setup-node` first.
   The install is skipped when `review` is off or nothing is pending, and a failed install fails the
@@ -307,7 +307,7 @@ Maven and Gradle; see [Local review](#local-review) for what it costs and which 
 | `review-timeout-minutes` | `''` | Limit for one review (`-Dcodiqo.review.timeoutMinutes`). Empty uses the plugin default of 150. `per-commit-timeout` is raised to fit it plus 30 minutes. |
 | `review-temperature` | `''` | Sampling temperature of the review agents (`-Dcodiqo.review.temperature`), set on every model call. Empty uses the plugin default of 1.0. |
 | `review-top-p` | `''` | Nucleus-sampling cut-off of the review agents (`-Dcodiqo.review.topP`). Empty uses the plugin default of 0.95. |
-| `opencode-version` | `2.1.4` | Version of the OpenCode CLI (`@opencode/cli` on npm) installed for the review. |
+| `opencode-version` | `2.2.2` | Version of the OpenCode CLI (`@opencode/cli` on npm) installed for the review. |
 
 ### Analysis depth
 
