@@ -107,9 +107,9 @@ inputs:
     required: false
     default: '1024'
   index-batch-size:
-    description: 'How many commits are sent to the API per index request.'
+    description: 'How many commits are sent to the API per index request (-Dcodiqo.indexBatchSize, Maven only). Empty uses the plugin default of 256; the API accepts at most 500.'
     required: false
-    default: '200'
+    default: ''
   index-ref:
     description: 'Git ref whose history is walked to find commits needing analysis (-Dcodiqo.indexRef). Empty uses HEAD, which is what a normal branch build wants; set it to index a ref other than the one checked out.'
     required: false

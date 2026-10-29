@@ -238,7 +238,7 @@ every commit is excluded. There are no other review switches. It works with Mave
 | `include-branches` | `''` | Comma-separated regex patterns; only commits on a matching branch are indexed and analysed. Applied while walking history, so a non-matching commit costs no build. |
 | `first-parent-only` | `true` | Measure a merge as what it brought to the target branch. |
 | `max-commits-per-run` | `1024` | Upper bound per run. Lower it for a first adoption. |
-| `index-batch-size` | `200` | Commits per index request. |
+| `index-batch-size` | `''` | Commits per index request (Maven only). Empty uses the plugin default of 256; the API accepts at most 500. |
 | `index-ref` | `''` | Ref whose history is walked for pending commits. Empty uses `HEAD`. |
 
 ### Timeouts
