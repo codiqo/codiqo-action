@@ -246,6 +246,22 @@ jobs:
           done
           echo "ok: timeout budgets nest"
 
+      # One commit's progress file holds a build per session (the Maven fork's compile run, then its
+      # test run); the module count restarts with each, so the test run never reads "17/15".
+      - name: module progress counts each build session from one
+        run: |
+          set -euo pipefail
+          . scripts/lib.sh
+          file="$(mktemp)"
+          printf '1\tSESSION\t2\n2\tSUCCESS\tg:a\t1000\n3\tSUCCESS\tg:b\t2000\n' > "$file"
+          first="$(codiqo::_emit_progress "$file"; echo "seen=$CODIQO_PROGRESS_SEEN")"
+          printf '4\tSESSION\t2\n5\tSUCCESS\tg:a\t3000\n6\tSUCCESS\tg:b\t4000\n' >> "$file"
+          CODIQO_PROGRESS_SEEN=3
+          second="$(codiqo::_emit_progress "$file")"
+          case "$first" in *'2/2 SUCCESS b'*'seen=3'*) ;; *) echo "FAIL: first build: $first"; exit 1 ;; esac
+          case "$second" in *'1/2 SUCCESS a'*'2/2 SUCCESS b'*) ;; *) echo "FAIL: second build kept counting: $second"; exit 1 ;; esac
+          echo "ok: each build session counts its modules from one"
+
       # An unsized heap is a quarter of the runner, which large projects outgrow; the default is half,
       # and a heap the caller or the job already set is never touched.
       - name: an unsized Maven heap gets the default cap

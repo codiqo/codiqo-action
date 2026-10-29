@@ -183,6 +183,10 @@ codiqo::_cpu_sample() {
 # The whole file is scanned each time to keep the done count, which stays cheap at a few
 # hundred modules. Called directly rather than in $(...), so CODIQO_PROGRESS_SEEN survives.
 #
+# The count restarts at every SESSION line: one commit's file holds a build per session (the
+# Maven fork's compile run and then its test run), and a count carried across them reported the
+# test run's modules as "17/15" after the compile run's fifteen.
+#
 codiqo::_emit_progress() {
     local file="$1" complete
     if [ -z "$file" ] || [ ! -s "$file" ]; then
@@ -194,7 +198,7 @@ codiqo::_emit_progress() {
     fi
     awk -F '\t' -v from="${CODIQO_PROGRESS_SEEN:-0}" -v to="$complete" '
         NR > to { exit }
-        $2 == "SESSION" { total = $3 }
+        $2 == "SESSION" { total = $3; done = 0 }
         $2 == "SUCCESS" || $2 == "FAILED" || $2 == "SKIPPED" { done++ }
         NR <= from { next }
         $2 == "STAGE_STARTED" { printf "[stage] %s started\n", $3; next }
