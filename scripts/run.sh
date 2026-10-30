@@ -228,7 +228,7 @@ export CODIQO_DEFAULT_BRANCH="${CODIQO_DEFAULT_BRANCH:-${CI_DEFAULT_BRANCH:-}}"
 codiqo::step "Resolve Codiqo configuration" resolve-config.sh
 
 if ! command -v java > /dev/null 2>&1; then
-    codiqo::die "the job image has no java. Use a JDK image, Java 21 or newer, such as eclipse-temurin:21-jdk."
+    codiqo::die "the job image has no java. Use a JDK image, Java 25 or newer, such as eclipse-temurin:25-jdk."
 fi
 java -version 2>&1 | head -n 1
 

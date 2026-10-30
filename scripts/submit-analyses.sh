@@ -336,6 +336,7 @@ for commit in "${commits[@]}"; do
         if [ -n "${CODIQO_IN_INCLUDE_AUTHOR_EMAILS:-}" ]; then cmd+=("-Pcodiqo.includeAuthorEmails=${CODIQO_IN_INCLUDE_AUTHOR_EMAILS}"); fi
         if [ -n "${CODIQO_IN_INCLUDE_BRANCHES:-}" ]; then cmd+=("-Pcodiqo.includeBranches=${CODIQO_IN_INCLUDE_BRANCHES}"); fi
         if [ -n "${CODIQO_IN_JAVA_HOME:-}" ]; then cmd+=("-Pcodiqo.javaHome=${CODIQO_IN_JAVA_HOME}"); fi
+        if [ -n "${CODIQO_IN_JDTLS_JAVA_HOME:-}" ]; then cmd+=("-Pcodiqo.jdtlsJavaHome=${CODIQO_IN_JDTLS_JAVA_HOME}"); fi
         #
         # The Gradle plugin reviews the checked-out commit beside the build, with the same settings
         # as Maven passed as project properties.
@@ -433,6 +434,7 @@ for commit in "${commits[@]}"; do
     if [ -n "${CODIQO_IN_EXCLUDE_AUTHOR_EMAILS:-}" ]; then cmd+=("-Dcodiqo.excludeAuthorEmails=${CODIQO_IN_EXCLUDE_AUTHOR_EMAILS}"); fi
     if [ -n "${CODIQO_IN_INCLUDE_AUTHOR_EMAILS:-}" ]; then cmd+=("-Dcodiqo.includeAuthorEmails=${CODIQO_IN_INCLUDE_AUTHOR_EMAILS}"); fi
     if [ -n "${CODIQO_IN_JAVA_HOME:-}" ]; then cmd+=("-Dcodiqo.javaHome=${CODIQO_IN_JAVA_HOME}"); fi
+    if [ -n "${CODIQO_IN_JDTLS_JAVA_HOME:-}" ]; then cmd+=("-Dcodiqo.jdtlsJavaHome=${CODIQO_IN_JDTLS_JAVA_HOME}"); fi
     if [ -n "${CODIQO_IN_MAVEN_HOME:-}" ]; then cmd+=("-Dcodiqo.mavenHome=${CODIQO_IN_MAVEN_HOME}"); fi
     if [ -n "${CODIQO_IN_JDTLS_VERSION:-}" ]; then cmd+=("-Dcodiqo.jdtlsVersion=${CODIQO_IN_JDTLS_VERSION}"); fi
     if [ -n "${CODIQO_IN_IMPORT_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Dcodiqo.importTimeoutMinutes=${CODIQO_IN_IMPORT_TIMEOUT_MINUTES}"); fi

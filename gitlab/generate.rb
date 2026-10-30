@@ -26,7 +26,7 @@ ACTION = File.read(File.join(ROOT, 'action.yml'))
 # and the deprecated names were never part of the GitLab template.
 #
 EXCLUDED = %w[
-  api-key settings-xml java-version java-distribution cache upload-logs log-artifact-name log-retention-days
+  api-key settings-xml java-version java-distribution jdtls-java-version cache upload-logs log-artifact-name log-retention-days
   test-failure-halt-share test-failure-halt-min-tests
 ].freeze
 
@@ -35,10 +35,11 @@ EXCLUDED = %w[
 #
 GITLAB_INPUTS = [
   ['stage', 'test', 'Pipeline stage the codiqo-analyze job runs in.'],
-  ['image', 'eclipse-temurin:21-jdk',
-   'Job image. It needs a JDK, Java 21 or newer, and bash; git, python3, curl, tar and gzip are installed when ' \
-   'missing and the job runs as root, and Node.js for the review when it has no npm. Choose the JDK the project ' \
-   'builds with: every analysed commit is built with it.'],
+  ['image', 'eclipse-temurin:25-jdk',
+   'Job image. It needs a JDK and bash; git, python3, curl, tar and gzip are installed when missing and the job ' \
+   'runs as root, and Node.js for the review when it has no npm. Choose the JDK the project builds with: every ' \
+   'analysed commit is built with it, and it also runs the language server, which needs Java 25 or newer. A ' \
+   'project that builds only on an older JDK needs an image with a Java 25 JDK as well, named in jdtls-java-home.'],
   ['job-timeout', '6h',
    'GitLab timeout of the whole job, which works through every pending commit in turn. It can exceed the ' \
    'project timeout but not the runner\'s.'],

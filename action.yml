@@ -25,7 +25,7 @@ inputs:
     required: false
     default: '1.0-SNAPSHOT'
   java-version:
-    description: 'JDK to install. Set to an empty string to skip JDK setup entirely, for example when the workflow already ran actions/setup-java or the runner has a pre-provisioned JDK. It must be able to build your project, and it must be Java 21 or newer: codiqo-maven-plugin declares requiredJavaVersion 21, and Maven refuses to execute a plugin whose prerequisite the running JDK cannot meet. The default is that floor rather than the newest release, so raise it when your project needs a newer toolchain. Under build-tool: gradle it is also the JDK every analysed commit''s own wrapper runs on, and a Gradle release only accepts JDKs that predate it — so a default above the floor would fail every commit pinning an older wrapper.'
+    description: 'JDK to install. Set to an empty string to skip JDK setup entirely, for example when the workflow already ran actions/setup-java or the runner has a pre-provisioned JDK. It must be able to build your project, and it must be Java 21 or newer: codiqo-maven-plugin declares requiredJavaVersion 21, and Maven refuses to execute a plugin whose prerequisite the running JDK cannot meet. The default is that floor rather than the newest release, so raise it when your project needs a newer toolchain. The Eclipse JDT language server runs on a JDK of its own, which jdtls-java-version installs. Under build-tool: gradle it is also the JDK every analysed commit''s own wrapper runs on, and a Gradle release only accepts JDKs that predate it — so a default above the floor would fail every commit pinning an older wrapper.'
     required: false
     default: '21'
   java-distribution:
@@ -33,7 +33,15 @@ inputs:
     required: false
     default: 'temurin'
   java-home:
-    description: 'Explicit JDK home for the per-commit build and the language server (-Dcodiqo.javaHome). Left empty they inherit JAVA_HOME and the java on PATH.'
+    description: 'Explicit JDK home for the per-commit build (-Dcodiqo.javaHome), and for the language server when neither jdtls-java-home nor jdtls-java-version gives it one. Left empty they inherit JAVA_HOME and the java on PATH.'
+    required: false
+    default: ''
+  jdtls-java-version:
+    description: 'JDK installed beside java-version for the Eclipse JDT language server alone (-Dcodiqo.jdtlsJavaHome), without becoming the default JDK. From jdt.ls 1.62.0, the plugin''s default, the server needs Java 25 or newer, while your project keeps building on java-version. Not installed when it equals java-version or jdtls-java-home is set. An empty string runs the server on the build''s JDK, which must then be Java 25 or newer.'
+    required: false
+    default: '25'
+  jdtls-java-home:
+    description: 'Explicit JDK home for the Eclipse JDT language server alone (-Dcodiqo.jdtlsJavaHome), Java 25 or newer for jdt.ls 1.62.0 and later; it takes precedence over jdtls-java-version. Left empty, the server runs on the JDK jdtls-java-version installs (GitHub only), else on java-home, else on JAVA_HOME.'
     required: false
     default: ''
   build-tool:
@@ -485,6 +493,19 @@ runs:
         cache: ${{ inputs.cache == 'auto' && (inputs.build-tool == 'gradle' && 'gradle' || 'maven') || inputs.cache }}
 
     #
+    # Installed without becoming the default, so JAVA_HOME and PATH stay the build's JDK. Not installed
+    # when it would be java-version's JDK again: the language server then runs on that JDK.
+    #
+    - name: Set up JDK ${{ inputs.jdtls-java-version }} for the language server
+      id: jdtls-java
+      if: inputs.jdtls-java-version != '' && inputs.jdtls-java-home == '' && inputs.jdtls-java-version != inputs.java-version
+      uses: actions/setup-java@v5
+      with:
+        java-version: ${{ inputs.jdtls-java-version }}
+        distribution: ${{ inputs.java-distribution }}
+        set-default: false
+
+    #
     # After resolve-config, which has already chosen between ./mvnw and mvn, and before the first
     # step that runs Maven.
     #
@@ -653,6 +674,7 @@ runs:
         CODIQO_IN_STOP_ON_FIRST_FAILURE: ${{ inputs.stop-on-first-failure }}
         CODIQO_IN_LOG_COMMIT_AUTHORS: ${{ inputs.log-commit-authors }}
         CODIQO_IN_JAVA_HOME: ${{ inputs.java-home }}
+        CODIQO_IN_JDTLS_JAVA_HOME: ${{ inputs.jdtls-java-home || steps.jdtls-java.outputs.path }}
         CODIQO_IN_MAVEN_HOME: ${{ inputs.maven-home }}
         CODIQO_IN_MAVEN_PARALLELISM: ${{ inputs.maven-parallelism }}
         CODIQO_IN_JDTLS_VERSION: ${{ inputs.jdtls-version }}

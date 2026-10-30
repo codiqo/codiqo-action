@@ -79,6 +79,10 @@ built a Java model (see Troubleshooting).
   `requiredJavaVersion` 21, so Maven refuses to run it on anything older. Set `java-version`
   accordingly, or `''` to manage the JDK yourself. Under `build-tool: gradle` the same JDK runs
   every analysed commit's own wrapper, so a newer one is not automatically better.
+- **Java 25 for the language server.** From jdt.ls 1.62.0, the plugin's default, the Eclipse JDT
+  language server needs Java 25 or newer. The action installs it beside your build's JDK
+  (`jdtls-java-version`, default `25`) and gives it to the language server alone, so your project keeps
+  building on `java-version`; `jdtls-java-home` names one the runner already has.
 - **Time.** Each commit runs a full `clean verify`. Give the job a generous `timeout-minutes`, cap
   the first run with `max-commits-per-run`, and consider `ignore-coverage: true` while trialling
   (under Gradle, pair it with `gradle-tasks: ''` — see the Gradle section).
@@ -124,7 +128,7 @@ include:
   - remote: https://raw.githubusercontent.com/codiqo/codiqo-action/main/gitlab/codiqo.yml
     inputs:
       action-ref: main            # the ref in the URL above; the job downloads the scripts at this ref
-      image: eclipse-temurin:21-jdk   # a JDK that builds your project, 21 or newer
+      image: eclipse-temurin:25-jdk   # a JDK that builds your project, 25 or newer
       # any input of the action, for example:
       # maven-parallelism: 1C
 ```
@@ -259,7 +263,9 @@ every commit is excluded. There are no other review switches. It works with Mave
 | `codiqo-version` | `1.0-SNAPSHOT` | Plugin version. Codiqo is pre-1.0, so a snapshot repository is added automatically. |
 | `java-version` | `21` | JDK to install, 21 or newer — the plugin's floor, not the newest release. `''` skips JDK setup entirely. Under `build-tool: gradle` this JDK also runs each analysed commit's own wrapper, and a Gradle release rejects JDKs newer than itself, so raise it only as far as your oldest wrapper allows. |
 | `java-distribution` | `temurin` | Passed to `actions/setup-java`. |
-| `java-home` | `''` | Explicit JDK for the per-commit build and language server. |
+| `java-home` | `''` | Explicit JDK for the per-commit build, and for the language server when neither `jdtls-java-home` nor `jdtls-java-version` gives it one. |
+| `jdtls-java-version` | `25` | JDK installed beside `java-version` for the Eclipse JDT language server alone, without becoming the default JDK: from jdt.ls 1.62.0, the plugin's default, the server needs Java 25 or newer. Not installed when it equals `java-version` or `jdtls-java-home` is set; `''` runs the server on the build's JDK, which must then be 25 or newer. GitHub only. |
+| `jdtls-java-home` | `''` | Explicit JDK for the language server alone, Java 25 or newer; takes precedence over `jdtls-java-version`. On GitLab, a second JDK in the job image for a project that builds only on an older one. |
 | `build-tool` | `maven` | `maven` or `gradle`. See the Gradle section — that path is not at full parity. |
 | `gradle-command` | `auto` | `auto` prefers `./gradlew`, else `gradle`. Gradle only. |
 | `gradle-tasks` | `test` | Whitespace-separated tasks run before `codiqoSubmitAnalysis` on each commit. Empty runs none, so the analysis has no coverage to read. Gradle only. |

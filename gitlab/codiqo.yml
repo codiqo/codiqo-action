@@ -16,8 +16,8 @@ spec:
       description: "Pipeline stage the codiqo-analyze job runs in."
       default: "test"
     image:
-      description: "Job image. It needs a JDK, Java 21 or newer, and bash; git, python3, curl, tar and gzip are installed when missing and the job runs as root, and Node.js for the review when it has no npm. Choose the JDK the project builds with: every analysed commit is built with it."
-      default: "eclipse-temurin:21-jdk"
+      description: "Job image. It needs a JDK and bash; git, python3, curl, tar and gzip are installed when missing and the job runs as root, and Node.js for the review when it has no npm. Choose the JDK the project builds with: every analysed commit is built with it, and it also runs the language server, which needs Java 25 or newer. A project that builds only on an older JDK needs an image with a Java 25 JDK as well, named in jdtls-java-home."
+      default: "eclipse-temurin:25-jdk"
     job-timeout:
       description: "GitLab timeout of the whole job, which works through every pending commit in turn. It can exceed the project timeout but not the runner's."
       default: "6h"
@@ -43,7 +43,10 @@ spec:
       description: "Version of io.codiqo:codiqo-maven-plugin to run. Codiqo is pre-1.0, so this defaults to a snapshot and the action adds a snapshot repository for it automatically (see manage-plugin-repository)."
       default: "1.0-SNAPSHOT"
     java-home:
-      description: "Explicit JDK home for the per-commit build and the language server (-Dcodiqo.javaHome). Left empty they inherit JAVA_HOME and the java on PATH."
+      description: "Explicit JDK home for the per-commit build (-Dcodiqo.javaHome), and for the language server when neither jdtls-java-home nor jdtls-java-version gives it one. Left empty they inherit JAVA_HOME and the java on PATH."
+      default: ""
+    jdtls-java-home:
+      description: "Explicit JDK home for the Eclipse JDT language server alone (-Dcodiqo.jdtlsJavaHome), Java 25 or newer for jdt.ls 1.62.0 and later; it takes precedence over jdtls-java-version. Left empty, the server runs on the JDK jdtls-java-version installs (GitHub only), else on java-home, else on JAVA_HOME."
       default: ""
     build-tool:
       description: "Which build tool drives the analysis: \"maven\" or \"gradle\". Gradle support does not cover the time machine or build-failure capture; see the Gradle section of the README."
@@ -324,6 +327,7 @@ codiqo-analyze:
     CODIQO_IN_BRANCH: $[[ inputs.branch ]]
     CODIQO_IN_VERSION: $[[ inputs.codiqo-version ]]
     CODIQO_IN_JAVA_HOME: $[[ inputs.java-home ]]
+    CODIQO_IN_JDTLS_JAVA_HOME: $[[ inputs.jdtls-java-home ]]
     CODIQO_IN_BUILD_TOOL: $[[ inputs.build-tool ]]
     CODIQO_IN_GRADLE_COMMAND: $[[ inputs.gradle-command ]]
     CODIQO_IN_GRADLE_TASKS: $[[ inputs.gradle-tasks ]]
