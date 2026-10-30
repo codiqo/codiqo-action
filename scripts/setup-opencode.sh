@@ -12,7 +12,7 @@
 #
 set -euo pipefail
 # shellcheck source=scripts/lib.sh
-. "$GITHUB_ACTION_PATH/scripts/lib.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 version="${CODIQO_IN_OPENCODE_VERSION:?}"
 case "$version" in
@@ -21,7 +21,7 @@ case "$version" in
         ;;
 esac
 
-install_root="${RUNNER_TOOL_CACHE:-${RUNNER_TEMP:-/tmp}}/codiqo-opencode/$version"
+install_root="${CODIQO_TOOL_CACHE:-${RUNNER_TOOL_CACHE:-${RUNNER_TEMP:-/tmp}}}/codiqo-opencode/$version"
 executable="$install_root/bin/opencode"
 
 #
@@ -37,7 +37,7 @@ if [ -x "$executable" ] && [ "$(installed_version)" = "$version" ]; then
     codiqo::log "reusing OpenCode $version from $install_root."
 else
     if ! command -v npm > /dev/null 2>&1; then
-        codiqo::die "review: true needs npm to install OpenCode $version, and npm is not on PATH. Add actions/setup-node before this action, or set review: false."
+        codiqo::die "review: true needs npm to install OpenCode $version, and npm is not on PATH. Add actions/setup-node before this action (on GitLab the template installs Node itself), or set review: false."
     fi
 
     rm -rf "$install_root"
@@ -58,8 +58,6 @@ if [ "$actual" != "$version" ]; then
     codiqo::die "the OpenCode install at $executable reports version '${actual:-nothing}', not $version. The platform binary may be missing for $(uname -s)-$(uname -m)."
 fi
 
-if [ -n "${GITHUB_PATH:-}" ]; then
-    printf '%s\n' "$install_root/bin" >> "$GITHUB_PATH"
-fi
+codiqo::add_path "$install_root/bin"
 codiqo::export CODIQO_OPENCODE_EXECUTABLE "$executable"
 codiqo::log "OpenCode $version is at $executable."

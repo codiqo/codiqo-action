@@ -11,7 +11,7 @@
 #
 set -euo pipefail
 # shellcheck source=scripts/lib.sh
-. "$GITHUB_ACTION_PATH/scripts/lib.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 settings_dir="$HOME/.m2"
 settings_file="$settings_dir/settings.xml"
@@ -87,7 +87,7 @@ XML
         chmod 600 "$settings_file"
         codiqo::log "generated $settings_file with a snapshot repository for ${CODIQO_IN_VERSION:-the plugin}."
     else
-        if python3 "$GITHUB_ACTION_PATH/scripts/inject-plugin-repository.py" "$settings_file" "$repo_url"; then
+        if python3 "$CODIQO_ACTION_PATH/scripts/inject-plugin-repository.py" "$settings_file" "$repo_url"; then
             :
         else
             codiqo::warn "could not merge a snapshot repository into $settings_file. If '${CODIQO_IN_VERSION:-}' fails to resolve, add this to an active profile yourself:

@@ -13,7 +13,7 @@
 #
 set -euo pipefail
 # shellcheck source=scripts/lib.sh
-. "$GITHUB_ACTION_PATH/scripts/lib.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 version="${CODIQO_IN_MAVEN_VERSION:?}"
 case "$version" in
@@ -26,7 +26,7 @@ esac
 # The tool cache persists on a self-hosted runner, so a second run reuses the install. On a
 # hosted runner it is simply an empty directory.
 #
-install_root="${RUNNER_TOOL_CACHE:-${RUNNER_TEMP:-/tmp}}/codiqo-maven/$version"
+install_root="${CODIQO_TOOL_CACHE:-${RUNNER_TOOL_CACHE:-${RUNNER_TEMP:-/tmp}}}/codiqo-maven/$version"
 maven_home="$install_root/apache-maven-$version"
 
 if [ -x "$maven_home/bin/mvn" ]; then
@@ -66,9 +66,7 @@ else
     codiqo::log "installed Maven $version to $maven_home."
 fi
 
-if [ -n "${GITHUB_PATH:-}" ]; then
-    printf '%s\n' "$maven_home/bin" >> "$GITHUB_PATH"
-fi
+codiqo::add_path "$maven_home/bin"
 codiqo::export MAVEN_HOME "$maven_home"
 
 #

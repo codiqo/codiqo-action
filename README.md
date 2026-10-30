@@ -112,6 +112,51 @@ Everything above is per repository. For a team adding many repositories at once:
 - **Pin the ref your policy requires.** See [Versioning](#versioning): `@main` moves with every
   push to this repository; an organization that requires pinned actions uses `@<sha>`.
 
+## GitLab CI
+
+The same analysis runs on GitLab CI from `gitlab/codiqo.yml`, a template generated from this action's
+`action.yml`: it takes every input of the action under the same name and default, and its job runs the
+action's own scripts. Add your API key as a **masked** CI/CD variable named `CODIQO_API_KEY` (Settings >
+CI/CD > Variables), then include the template in `.gitlab-ci.yml`:
+
+```yaml
+include:
+  - remote: https://raw.githubusercontent.com/codiqo/codiqo-action/main/gitlab/codiqo.yml
+    inputs:
+      action-ref: main            # the ref in the URL above; the job downloads the scripts at this ref
+      image: eclipse-temurin:21-jdk   # a JDK that builds your project, 21 or newer
+      # any input of the action, for example:
+      # maven-parallelism: 1C
+```
+
+That adds one job, `codiqo-analyze`, which does on GitLab what the action does on GitHub:
+
+- **It indexes the history and analyses every pending commit**, oldest first, each under its own deadline,
+  so a push of five commits scores five, and a run that a failure stopped is picked up by the next one.
+  Running `submit-commit-analysis` for `$CI_COMMIT_SHA` alone scores only the tip of each push and never
+  backfills.
+- **It runs for pushes to the default branch, schedules, manual runs and API triggers**, never for merge
+  request pipelines or tags, whose commits are not the history being measured. Add a pipeline schedule
+  (CI/CD > Schedules) as the safety run for anything a push run missed, at a minute of its own.
+- **One job at a time per project** (`resource_group: codiqo-analyze`), so two pipelines never build and
+  review the same pending commits.
+- **Full history** (`GIT_DEPTH: "0"`): GitLab fetches 20 commits by default, and a commit whose parent is
+  missing is not analysed.
+- **Pinned tools**: Maven `maven-version`, OpenCode `opencode-version` and, when the image has no npm, a
+  SHA-256-checked Node.js `node-version` for its installer. A slim JDK image is enough: `git`, `python3`,
+  `curl`, `tar` and `gzip` are installed with the image's package manager when missing.
+- **Cached and kept**: the Maven repository, the language-server download and the installed tools are
+  cached under `.codiqo/cache/`; the per-commit logs are the job's artifact (`.codiqo/logs/`, redacted first,
+  kept `log-retention-days`), with the run summary in `summary.md` and printed at the end of the log.
+
+Inputs the template adds: `stage`, `image`, `job-timeout` (default `6h`, at most the runner's limit),
+`action-ref`, `action-archive-url` (a mirror of the scripts for a runner without access to GitHub),
+`node-version` and `log-retention-days`. Secrets never go in inputs: `CODIQO_API_KEY` is a masked variable,
+and a `settings.xml` with credentials is a **File** variable named `CODIQO_IN_SETTINGS_XML` (a masked
+variable must be a single line). Any other input can also be set as a CI/CD variable under the name the
+job uses for it (`CODIQO_IN_…`, listed in the template), which wins over the input. The job is a normal
+GitLab job, so extending it works as usual, for example with a `before_script` that trusts a corporate CA.
+
 ## Gradle
 
 Set `build-tool: gradle`. The action then applies the Codiqo Gradle plugin through a generated

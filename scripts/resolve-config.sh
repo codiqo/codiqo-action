@@ -5,7 +5,7 @@
 #
 set -euo pipefail
 # shellcheck source=scripts/lib.sh
-. "$GITHUB_ACTION_PATH/scripts/lib.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 mkdir -p "$CODIQO_WORK_DIR" "$CODIQO_LOGS_DIR"
 
@@ -17,6 +17,9 @@ mkdir -p "$CODIQO_WORK_DIR" "$CODIQO_LOGS_DIR"
 # and advises a browser login, which a runner cannot do. The usual causes are all on the GitHub side.
 #
 if [ "${CODIQO_IN_HAS_API_KEY:-true}" = "false" ]; then
+    if codiqo::on_gitlab; then
+        codiqo::die "CODIQO_API_KEY is empty. Add your Codiqo API key as a masked CI/CD variable named CODIQO_API_KEY (Settings > CI/CD > Variables). A protected variable reaches only pipelines of protected branches and tags."
+    fi
     codiqo::die "api-key is empty. Add your Codiqo API key as a secret named CODIQO_API_KEY and pass api-key: \${{ secrets.CODIQO_API_KEY }}. An organization secret must also grant this repository access, and a workflow run for a pull request from a fork receives no secrets."
 fi
 
@@ -26,7 +29,7 @@ fi
 # `[ -d .git ]` is wrong: in a linked worktree or a submodule .git is a *file*. Ask git.
 #
 if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-    codiqo::die "no git repository in $(pwd). Add actions/checkout with fetch-depth: 0 before this action."
+    codiqo::die "no git repository in $(pwd). Check the repository out with its full history first: $(codiqo::full_history_hint)."
 fi
 
 if ! git rev-parse --verify HEAD > /dev/null 2>&1; then
@@ -43,7 +46,7 @@ partial=$(git config --get remote.origin.partialclonefilter 2> /dev/null || true
 if [ "$shallow" = "true" ] || [ -n "$partial" ]; then
     detail="shallow=$shallow partial-filter=${partial:-none}"
     if [ "${CODIQO_IN_REQUIRE_FULL_HISTORY:-true}" = "true" ]; then
-        codiqo::die "this repository has incomplete history ($detail). Codiqo needs full history to walk commits — set fetch-depth: 0 on actions/checkout, or set require-full-history: false to proceed anyway."
+        codiqo::die "this repository has incomplete history ($detail). Codiqo needs full history to walk commits — $(codiqo::full_history_hint), or set require-full-history: false to proceed anyway."
     fi
     codiqo::warn "repository history is incomplete ($detail); commits whose parent is missing locally will be skipped silently."
 fi
@@ -202,14 +205,7 @@ fi
 #
 branch="${CODIQO_IN_BRANCH:-}"
 if [ -z "$branch" ]; then
-    case "${GITHUB_EVENT_NAME:-}" in
-        pull_request | pull_request_target) branch="${GITHUB_HEAD_REF:-}" ;;
-        *)
-            case "${GITHUB_REF:-}" in
-                refs/heads/*) branch="${GITHUB_REF_NAME:-}" ;;
-            esac
-            ;;
-    esac
+    branch=$(codiqo::ci_branch)
 fi
 if [ -z "$branch" ]; then
     codiqo::log "no branch could be derived from the event; letting the plugin auto-detect."

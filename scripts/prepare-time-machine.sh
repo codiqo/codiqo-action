@@ -10,7 +10,7 @@
 #
 set -euo pipefail
 # shellcheck source=scripts/lib.sh
-. "$GITHUB_ACTION_PATH/scripts/lib.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 ext_pom="$CODIQO_WORK_DIR/tm-ext-pom.xml"
 ext_cp="$CODIQO_WORK_DIR/tm-ext-cp.txt"
@@ -51,7 +51,7 @@ XML
             case "$trimmed" in
                 *=*) : ;;
                 *)
-                    printf '::error::time-machine-repositories line %s is not id=url\n' "$trimmed" >&2
+                    codiqo::error "time-machine-repositories line $trimmed is not id=url" >&2
                     exit 1
                     ;;
             esac

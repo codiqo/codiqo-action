@@ -10,7 +10,7 @@
 #
 set -euo pipefail
 # shellcheck source=scripts/lib.sh
-. "$GITHUB_ACTION_PATH/scripts/lib.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 init_script="$CODIQO_WORK_DIR/codiqo.init.gradle"
 repo_url="${CODIQO_IN_PLUGIN_REPOSITORY_URL:-https://central.sonatype.com/repository/maven-snapshots}"

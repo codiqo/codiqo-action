@@ -24,6 +24,14 @@ MIN_LENGTH = 8
 PLACEHOLDER = b"***"
 
 
+def warn(message: str) -> None:
+    """A warning in the CI's own form: a GitHub annotation, or a highlighted line in a GitLab log."""
+    if os.environ.get("GITLAB_CI") == "true":
+        print(f"\033[33mWARNING: {message}\033[0m")
+    else:
+        print(f"::warning::{message}")
+
+
 def secret_names() -> list[str]:
     raw = os.environ.get("CODIQO_REDACT_ENV_NAMES", "")
     names = [part.strip() for chunk in raw.split("\n") for part in chunk.split(",")]
@@ -98,7 +106,7 @@ def main() -> int:
         try:
             data = path.read_bytes()
         except OSError as err:
-            print(f"::warning::could not read {path.name}: {err}")
+            warn(f"could not read {path.name}: {err}")
             continue
         original = data
         for needle in needles:
@@ -109,7 +117,7 @@ def main() -> int:
                 path.write_bytes(data)
                 scrubbed += 1
             except OSError as err:
-                print(f"::warning::could not rewrite {path.name}: {err}")
+                warn(f"could not rewrite {path.name}: {err}")
 
     print(f"redaction scanned {scanned} file(s), rewrote {scrubbed}, using {len(needles)} pattern(s)")
     return 0

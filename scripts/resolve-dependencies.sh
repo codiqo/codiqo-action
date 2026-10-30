@@ -10,7 +10,7 @@
 #
 set -euo pipefail
 # shellcheck source=scripts/lib.sh
-. "$GITHUB_ACTION_PATH/scripts/lib.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 extra_args=()
 codiqo::read_lines_into extra_args "$CODIQO_WORK_DIR/build-args"

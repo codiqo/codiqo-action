@@ -7,9 +7,10 @@
 # shellcheck disable=SC2016
 set -euo pipefail
 # shellcheck source=scripts/lib.sh
-. "$GITHUB_ACTION_PATH/scripts/lib.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-if [ -z "${GITHUB_STEP_SUMMARY:-}" ]; then
+summary_file="${CODIQO_SUMMARY_FILE:-${GITHUB_STEP_SUMMARY:-}}"
+if [ -z "$summary_file" ]; then
     exit 0
 fi
 
@@ -34,8 +35,8 @@ failed="${CODIQO_SUMMARY_FAILED:-0}"
         printf 'Cause:\n\n```\n%s\n```\n\n' "$CODIQO_SUMMARY_ABORT"
     fi
     if [ "$missing" = "0" ]; then
-        printf 'No commits required analysis. If that is unexpected, confirm `actions/checkout` used `fetch-depth: 0` — an incomplete clone makes Codiqo skip commits whose parent is missing locally.\n'
+        printf 'No commits required analysis. If that is unexpected, check the clone holds every commit (%s) — an incomplete clone makes Codiqo skip commits whose parent is missing locally.\n' "$(codiqo::full_history_hint)"
     elif [ "$failed" != "0" ]; then
         printf 'Some commits failed. The per-commit logs are in the `%s` artifact.\n' "${CODIQO_IN_LOG_ARTIFACT_NAME:-codiqo-analyze-logs}"
     fi
-} >> "$GITHUB_STEP_SUMMARY"
+} >> "$summary_file"

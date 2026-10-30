@@ -6,28 +6,117 @@
 # degrade to "n/a" elsewhere. Everything else works on bash 3.2, which is why array files
 # are read with a `while read` loop rather than `mapfile` (absent before bash 4).
 
+#
+# The scripts find each other relative to this file rather than through $GITHUB_ACTION_PATH, which only
+# GitHub sets: the GitLab template runs the same scripts from a copy it downloads (scripts/run.sh).
+#
+CODIQO_ACTION_PATH="${CODIQO_ACTION_PATH:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 CODIQO_LOGS_DIR="${CODIQO_LOGS_DIR:-${RUNNER_TEMP:-/tmp}/step-logs}"
 CODIQO_WORK_DIR="${CODIQO_WORK_DIR:-${RUNNER_TEMP:-/tmp}/codiqo}"
 
+#
+# GitHub Actions turns workflow commands (::warning::, ::group::) in the log into annotations and
+# collapsible groups, and carries exports, outputs and PATH additions from one step to the next through
+# files it names in GITHUB_ENV, GITHUB_OUTPUT and GITHUB_PATH. GitLab CI has neither: its log folds
+# sections marked with section_start/section_end, and scripts/run.sh runs every step in one job, naming
+# the files itself in the CODIQO_* variables below, which win over GitHub's. Anything that is not GitLab
+# keeps GitHub's form, so a script run by hand or by the action's own tests prints what it always did.
+#
+codiqo::on_gitlab() { [ "${GITLAB_CI:-}" = "true" ]; }
+
 codiqo::log() { printf '%s\n' "$*"; }
-codiqo::warn() { printf '::warning::%s\n' "$*"; }
-codiqo::error() { printf '::error::%s\n' "$*"; }
-codiqo::group() { printf '::group::%s\n' "$*"; }
-codiqo::endgroup() { printf '::endgroup::\n'; }
+codiqo::warn() {
+    if codiqo::on_gitlab; then
+        printf '\033[33mWARNING: %s\033[0m\n' "$*"
+    else
+        printf '::warning::%s\n' "$*"
+    fi
+}
+codiqo::error() {
+    if codiqo::on_gitlab; then
+        printf '\033[31mERROR: %s\033[0m\n' "$*"
+    else
+        printf '::error::%s\n' "$*"
+    fi
+}
+codiqo::group() {
+    if codiqo::on_gitlab; then
+        CODIQO_SECTION="codiqo_${RANDOM}_$(date +%s)"
+        printf '\033[0Ksection_start:%s:%s[collapsed=true]\r\033[0K%s\n' "$(date +%s)" "$CODIQO_SECTION" "$*"
+    else
+        printf '::group::%s\n' "$*"
+    fi
+}
+codiqo::endgroup() {
+    if codiqo::on_gitlab; then
+        printf '\033[0Ksection_end:%s:%s\r\033[0K\n' "$(date +%s)" "${CODIQO_SECTION:-codiqo}"
+    else
+        printf '::endgroup::\n'
+    fi
+}
 codiqo::die() {
     codiqo::error "$*"
     exit 1
 }
 codiqo::output() {
-    if [ -n "${GITHUB_OUTPUT:-}" ]; then
-        printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"
+    local file="${CODIQO_OUTPUT_FILE:-${GITHUB_OUTPUT:-}}"
+    if [ -n "$file" ]; then
+        printf '%s=%s\n' "$1" "$2" >> "$file"
     fi
 }
 codiqo::export() {
-    if [ -n "${GITHUB_ENV:-}" ]; then
-        printf '%s=%s\n' "$1" "$2" >> "$GITHUB_ENV"
+    local file="${CODIQO_ENV_FILE:-${GITHUB_ENV:-}}"
+    if [ -n "$file" ]; then
+        printf '%s=%s\n' "$1" "$2" >> "$file"
     fi
     export "$1=$2"
+}
+codiqo::add_path() {
+    local file="${CODIQO_PATH_FILE:-${GITHUB_PATH:-}}"
+    if [ -n "$file" ]; then
+        printf '%s\n' "$1" >> "$file"
+    fi
+    export PATH="$1:$PATH"
+}
+
+#
+# The branch the run was started for: a pull or merge request's source branch, else the pushed or
+# scheduled branch. Nothing for a tag, whose ref names no branch to attribute the index to.
+#
+codiqo::ci_branch() {
+    if codiqo::on_gitlab; then
+        printf '%s' "${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-${CI_COMMIT_BRANCH:-}}"
+        return 0
+    fi
+    case "${GITHUB_EVENT_NAME:-}" in
+        pull_request | pull_request_target) printf '%s' "${GITHUB_HEAD_REF:-}" ;;
+        *)
+            case "${GITHUB_REF:-}" in
+                refs/heads/*) printf '%s' "${GITHUB_REF_NAME:-}" ;;
+            esac
+            ;;
+    esac
+}
+codiqo::ci_change_request() {
+    if codiqo::on_gitlab; then
+        [ -n "${CI_MERGE_REQUEST_IID:-}" ]
+        return
+    fi
+    case "${GITHUB_EVENT_NAME:-}" in
+        pull_request | pull_request_target) return 0 ;;
+    esac
+    return 1
+}
+
+#
+# What a user changes so the job checks out every commit, in the platform's own words.
+#
+codiqo::full_history_hint() {
+    if codiqo::on_gitlab; then
+        printf '%s' 'set GIT_DEPTH: "0" on the job (the Codiqo template does)'
+    else
+        printf '%s' 'set fetch-depth: 0 on actions/checkout'
+    fi
 }
 
 #

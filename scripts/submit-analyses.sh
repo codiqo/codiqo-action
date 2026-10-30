@@ -8,7 +8,7 @@
 #
 set -euo pipefail
 # shellcheck source=scripts/lib.sh
-. "$GITHUB_ACTION_PATH/scripts/lib.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 if [ ! -f "$CODIQO_MISSING_FILE" ]; then
     codiqo::log "no missing-analyses file at $CODIQO_MISSING_FILE; nothing to submit."
@@ -67,16 +67,14 @@ hotspots_commit=$(git rev-parse HEAD)
 # Only the default branch writes the project's snapshot, so unmerged code never replaces it.
 hotspots="${CODIQO_IN_HOTSPOTS:-true}"
 if [ "$hotspots" = "true" ]; then
-    case "${GITHUB_EVENT_NAME:-}" in
-        pull_request | pull_request_target) hotspots=false ;;
-        *)
-            if [ -n "${CODIQO_DEFAULT_BRANCH:-}" ] && [ "${GITHUB_REF:-}" != "refs/heads/${CODIQO_DEFAULT_BRANCH}" ]; then
-                hotspots=false
-            fi
-            ;;
-    esac
+    run_branch=$(codiqo::ci_branch)
+    if codiqo::ci_change_request; then
+        hotspots=false
+    elif [ -n "${CODIQO_DEFAULT_BRANCH:-}" ] && [ "$run_branch" != "${CODIQO_DEFAULT_BRANCH}" ]; then
+        hotspots=false
+    fi
     if [ "$hotspots" = "false" ]; then
-        codiqo::log "hotspots skipped: the snapshot is built only on the default branch (${CODIQO_DEFAULT_BRANCH:-unknown}), not on ${GITHUB_REF:-this ref}."
+        codiqo::log "hotspots skipped: the snapshot is built only on the default branch (${CODIQO_DEFAULT_BRANCH:-unknown}), not on ${run_branch:-this ref}."
     fi
 fi
 
