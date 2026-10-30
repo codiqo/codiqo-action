@@ -103,9 +103,9 @@ jobs:
           # every CODIQO_IN_* the scripts read must be set somewhere in action.yml
           set_here = set(re.findall(r"^\s+(CODIQO_[A-Z0-9_]+):", body, re.M))
           read = set()
-          # run.sh and setup-node.sh are the GitLab template's entry points, which action.yml never calls; the GitLab
+          # run.sh, setup-node.sh and setup-jdk.sh are the GitLab template's own steps, which action.yml never calls; the GitLab
           # template step checks the variables they read
-          gitlab_only = {"run.sh", "setup-node.sh"}
+          gitlab_only = {"run.sh", "setup-node.sh", "setup-jdk.sh"}
           for p in (f for f in pathlib.Path("scripts").iterdir() if f.is_file() and f.name not in gitlab_only):  # the python syntax step leaves __pycache__
               t = p.read_text()
               read |= set(re.findall(r"\$\{(CODIQO_IN_[A-Z0-9_]+)", t))

@@ -82,7 +82,8 @@ built a Java model (see Troubleshooting).
 - **Java 25 for the language server.** From jdt.ls 1.62.0, the plugin's default, the Eclipse JDT
   language server needs Java 25 or newer. The action installs it beside your build's JDK
   (`jdtls-java-version`, default `25`) and gives it to the language server alone, so your project keeps
-  building on `java-version`; `jdtls-java-home` names one the runner already has.
+  building on its own JDK, `java-version` on GitHub or the job image's on GitLab; `jdtls-java-home` names
+  one the runner already has.
 - **Time.** Each commit runs a full `clean verify`. Give the job a generous `timeout-minutes`, cap
   the first run with `max-commits-per-run`, and consider `ignore-coverage: true` while trialling
   (under Gradle, pair it with `gradle-tasks: ''` — see the Gradle section).
@@ -264,8 +265,8 @@ every commit is excluded. There are no other review switches. It works with Mave
 | `java-version` | `21` | JDK to install, 21 or newer — the plugin's floor, not the newest release. `''` skips JDK setup entirely. Under `build-tool: gradle` this JDK also runs each analysed commit's own wrapper, and a Gradle release rejects JDKs newer than itself, so raise it only as far as your oldest wrapper allows. |
 | `java-distribution` | `temurin` | Passed to `actions/setup-java`. |
 | `java-home` | `''` | Explicit JDK for the per-commit build, and for the language server when neither `jdtls-java-home` nor `jdtls-java-version` gives it one. |
-| `jdtls-java-version` | `25` | JDK installed beside `java-version` for the Eclipse JDT language server alone, without becoming the default JDK: from jdt.ls 1.62.0, the plugin's default, the server needs Java 25 or newer. Not installed when it equals `java-version` or `jdtls-java-home` is set; `''` runs the server on the build's JDK, which must then be 25 or newer. GitHub only. |
-| `jdtls-java-home` | `''` | Explicit JDK for the language server alone, Java 25 or newer; takes precedence over `jdtls-java-version`. On GitLab, a second JDK in the job image for a project that builds only on an older one. |
+| `jdtls-java-version` | `25` | Java release the Eclipse JDT language server runs on, beside the JDK that builds the project: from jdt.ls 1.62.0, the plugin's default, the server needs Java 25 or newer. On GitHub it is installed with `actions/setup-java`, or taken from `java-version` when the two are equal; on GitLab the image's JDK serves when it is this release or newer, and otherwise Temurin's latest build is downloaded, SHA-256 checked and cached. Either way the plugin gets that JDK's home as `codiqo.jdtlsJavaHome`. `''` runs the server on the build's JDK, which must then be 25 or newer. |
+| `jdtls-java-home` | `''` | Explicit JDK for the language server alone, Java 25 or newer; takes precedence over `jdtls-java-version`. |
 | `build-tool` | `maven` | `maven` or `gradle`. See the Gradle section — that path is not at full parity. |
 | `gradle-command` | `auto` | `auto` prefers `./gradlew`, else `gradle`. Gradle only. |
 | `gradle-tasks` | `test` | Whitespace-separated tasks run before `codiqoSubmitAnalysis` on each commit. Empty runs none, so the analysis has no coverage to read. Gradle only. |

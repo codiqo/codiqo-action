@@ -228,7 +228,7 @@ export CODIQO_DEFAULT_BRANCH="${CODIQO_DEFAULT_BRANCH:-${CI_DEFAULT_BRANCH:-}}"
 codiqo::step "Resolve Codiqo configuration" resolve-config.sh
 
 if ! command -v java > /dev/null 2>&1; then
-    codiqo::die "the job image has no java. Use a JDK image, Java 25 or newer, such as eclipse-temurin:25-jdk."
+    codiqo::die "the job image has no java. Use a JDK image that builds the project, such as eclipse-temurin:25-jdk."
 fi
 java -version 2>&1 | head -n 1
 
@@ -250,6 +250,7 @@ codiqo::step "Index commits" index-commits.sh
 missing_count="$(codiqo::step_output missing-count)"
 
 if [ "${missing_count:-0}" != "0" ]; then
+    codiqo::step "Set up the language server's JDK" setup-jdk.sh
     if [ "${CODIQO_IN_TIME_MACHINE:-true}" = "true" ] && [ "$build_tool" != "gradle" ]; then
         codiqo::step "Prepare the time-machine host extension" prepare-time-machine.sh
     fi

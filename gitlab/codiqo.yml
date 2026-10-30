@@ -16,7 +16,7 @@ spec:
       description: "Pipeline stage the codiqo-analyze job runs in."
       default: "test"
     image:
-      description: "Job image. It needs a JDK and bash; git, python3, curl, tar and gzip are installed when missing and the job runs as root, and Node.js for the review when it has no npm. Choose the JDK the project builds with: every analysed commit is built with it, and it also runs the language server, which needs Java 25 or newer. A project that builds only on an older JDK needs an image with a Java 25 JDK as well, named in jdtls-java-home."
+      description: "Job image. It needs a JDK and bash; git, python3, curl, tar and gzip are installed when missing and the job runs as root, and Node.js for the review when it has no npm. Choose the JDK the project builds with: every analysed commit is built with it. The language server, which needs Java 25 or newer, runs on that JDK when it is jdtls-java-version or newer, and otherwise on a Temurin build the job downloads beside it."
       default: "eclipse-temurin:25-jdk"
     job-timeout:
       description: "GitLab timeout of the whole job, which works through every pending commit in turn. It can exceed the project timeout but not the runner's."
@@ -45,8 +45,11 @@ spec:
     java-home:
       description: "Explicit JDK home for the per-commit build (-Dcodiqo.javaHome), and for the language server when neither jdtls-java-home nor jdtls-java-version gives it one. Left empty they inherit JAVA_HOME and the java on PATH."
       default: ""
+    jdtls-java-version:
+      description: "Java release the Eclipse JDT language server runs on, beside the JDK that builds the project and without becoming the default JDK: from jdt.ls 1.62.0, the plugin's default, the server needs Java 25 or newer, while the project keeps building on its own JDK. On GitHub it is installed with actions/setup-java, or taken from java-version when the two are equal; on GitLab the image's JDK serves when it is this release or newer, and otherwise Temurin's latest build of it is downloaded (SHA-256 checked) and cached. Either way the plugin gets that JDK's home as -Dcodiqo.jdtlsJavaHome. Ignored when jdtls-java-home is set; an empty string runs the server on the build's JDK, which must then be Java 25 or newer."
+      default: "25"
     jdtls-java-home:
-      description: "Explicit JDK home for the Eclipse JDT language server alone (-Dcodiqo.jdtlsJavaHome), Java 25 or newer for jdt.ls 1.62.0 and later; it takes precedence over jdtls-java-version. Left empty, the server runs on the JDK jdtls-java-version installs (GitHub only), else on java-home, else on JAVA_HOME."
+      description: "Explicit JDK home for the Eclipse JDT language server alone (-Dcodiqo.jdtlsJavaHome), Java 25 or newer for jdt.ls 1.62.0 and later; it takes precedence over jdtls-java-version."
       default: ""
     build-tool:
       description: "Which build tool drives the analysis: \"maven\" or \"gradle\". Gradle support does not cover the time machine or build-failure capture; see the Gradle section of the README."
@@ -327,6 +330,7 @@ codiqo-analyze:
     CODIQO_IN_BRANCH: $[[ inputs.branch ]]
     CODIQO_IN_VERSION: $[[ inputs.codiqo-version ]]
     CODIQO_IN_JAVA_HOME: $[[ inputs.java-home ]]
+    CODIQO_IN_JDTLS_JAVA_VERSION: $[[ inputs.jdtls-java-version ]]
     CODIQO_IN_JDTLS_JAVA_HOME: $[[ inputs.jdtls-java-home ]]
     CODIQO_IN_BUILD_TOOL: $[[ inputs.build-tool ]]
     CODIQO_IN_GRADLE_COMMAND: $[[ inputs.gradle-command ]]
