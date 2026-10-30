@@ -12,7 +12,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # actionlint is fetched as a pinned release binary rather than via a third-party action:
       # a public action should not push its own supply chain onto every consumer's audit.
@@ -119,7 +119,7 @@ jobs:
   docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       # Docs drift is the failure mode nobody notices: an input added without a README row is
       # invisible to users, so make it a build failure instead.
       - name: every input is documented in the README
@@ -148,7 +148,7 @@ jobs:
   unit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         # resolve-config.sh refuses a shallow clone, which is what a bare checkout is
         with:
           fetch-depth: 0
