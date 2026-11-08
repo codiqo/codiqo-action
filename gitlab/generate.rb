@@ -48,7 +48,7 @@ GITLAB_INPUTS = [
   ['action-archive-url', '',
    'Where the job downloads the action\'s scripts from, as a .tar.gz with one top directory. Empty uses ' \
    'codiqo/codiqo-action at action-ref on GitHub; set it for a runner that reaches GitHub only through a mirror.'],
-  ['node-version', '24.22.1',
+  ['node-version', '26.13.0',
    'Node.js release installed, SHA-256 checked, for the npm that installs OpenCode when the image has no npm. ' \
    'Only with review: true.'],
   ['log-retention-days', '7', 'Days the job keeps its log artifact.']

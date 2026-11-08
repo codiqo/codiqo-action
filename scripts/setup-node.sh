@@ -20,7 +20,7 @@ fi
 version="${CODIQO_IN_NODE_VERSION:?}"
 case "$version" in
     *[!0-9.]* | '' | .*)
-        codiqo::die "node-version '$version' is not a Node.js release such as 24.22.1."
+        codiqo::die "node-version '$version' is not a Node.js release such as 26.13.0."
         ;;
 esac
 
@@ -60,6 +60,29 @@ else
     tar -xzf "$download_dir/$name.tar.gz" -C "$install_root"
     rm -rf "$download_dir"
     codiqo::log "installed Node.js $version to $node_home."
+fi
+
+#
+# From Node.js 26 the official linux build links libatomic.so.1, which slim JDK images such as
+# eclipse-temurin's do not carry. It is installed as scripts/run.sh installs a missing tool: with the image's
+# package manager when the job runs as root. Checked on every run, not only after a download, because a
+# cached Node lands in a fresh container. Without this a Node that cannot start fails only at the npm
+# install, under a message that blames opencode-version.
+#
+if ! "$node_home/bin/node" --version > /dev/null 2>&1; then
+    if [ "$(id -u)" = "0" ]; then
+        codiqo::log "installing libatomic, which Node.js $version needs and the image lacks."
+        if command -v apt-get > /dev/null 2>&1; then
+            DEBIAN_FRONTEND=noninteractive apt-get update -qq > /dev/null \
+                && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends libatomic1 > /dev/null || true
+        elif command -v microdnf > /dev/null 2>&1; then
+            microdnf install -y libatomic > /dev/null || true
+        elif command -v dnf > /dev/null 2>&1; then
+            dnf install -y -q libatomic > /dev/null || true
+        fi
+    fi
+    "$node_home/bin/node" --version > /dev/null 2>&1 \
+        || codiqo::die "Node.js $version does not start in this image: $("$node_home/bin/node" --version 2>&1 | head -1). Use an image that has npm, or one with glibc and libatomic."
 fi
 
 codiqo::add_path "$node_home/bin"

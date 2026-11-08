@@ -29,7 +29,7 @@ spec:
       default: ""
     node-version:
       description: "Node.js release installed, SHA-256 checked, for the npm that installs OpenCode when the image has no npm. Only with review: true."
-      default: "24.22.1"
+      default: "26.13.0"
     log-retention-days:
       description: "Days the job keeps its log artifact."
       default: "7"

@@ -45,10 +45,12 @@ else
     codiqo::log "installing @opencode/cli@$version from npm."
     #
     # --ignore-scripts=false overrides a runner-wide ignore-scripts: the postinstall is what moves the
-    # platform binary into bin/, and without it the command is an empty placeholder.
+    # platform binary into bin/, and without it the command is an empty placeholder. --allow-scripts
+    # names that postinstall for npm's allowScripts, which from npm 11.20 (Node.js 26) warns about any
+    # install script it does not cover; npm 10 and earlier 11 releases accept the flag silently.
     #
-    if ! npm install --global --prefix "$install_root" --ignore-scripts=false --no-fund --no-audit \
-        "@opencode/cli@$version"; then
+    if ! npm install --global --prefix "$install_root" --ignore-scripts=false --allow-scripts=@opencode/cli \
+        --no-fund --no-audit "@opencode/cli@$version"; then
         codiqo::die "could not install @opencode/cli@$version from npm. Check opencode-version: it must be a published @opencode/cli version (npm view @opencode/cli versions)."
     fi
 fi
