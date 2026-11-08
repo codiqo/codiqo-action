@@ -18,7 +18,7 @@ jobs:
       # a public action should not push its own supply chain onto every consumer's audit.
       - name: actionlint
         env:
-          ACTIONLINT_VERSION: '1.7.7'
+          ACTIONLINT_VERSION: '1.7.12'
         run: |
           set -euo pipefail
           curl -fsSL -o actionlint.tgz \

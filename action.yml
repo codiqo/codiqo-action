@@ -482,7 +482,7 @@ runs:
     - name: Set up JDK ${{ inputs.java-version }}
       id: java
       if: inputs.java-version != ''
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@v6
       with:
         java-version: ${{ inputs.java-version }}
         distribution: ${{ inputs.java-distribution }}
@@ -501,7 +501,7 @@ runs:
     - name: Set up JDK ${{ inputs.jdtls-java-version }} for the language server
       id: jdtls-java
       if: inputs.jdtls-java-version != '' && inputs.jdtls-java-home == '' && inputs.jdtls-java-version != inputs.java-version
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@v6
       with:
         java-version: ${{ inputs.jdtls-java-version }}
         distribution: ${{ inputs.java-distribution }}
