@@ -79,6 +79,88 @@ if [ "$hotspots" = "true" ]; then
 fi
 
 #
+# The run's settings, each as codiqo.<name>=<value>. The Maven and the Gradle plugin read every
+# setting under one name, so this one list serves both: Maven takes each as a user property (-D)
+# and Gradle as a project property (-P), and an input added here reaches both build tools. Only
+# what one plugin alone has is added beside its command below. An empty value is left out, so the
+# plugin's own default holds.
+#
+settings=()
+add_setting() {
+    if [ -n "$2" ]; then
+        settings+=("codiqo.$1=$2")
+    fi
+}
+add_setting apiKey "env:CODIQO_API_KEY"
+add_setting apiUrl "${CODIQO_IN_API_URL:-}"
+add_setting connectTimeoutSeconds "${CODIQO_IN_API_CONNECT_TIMEOUT:-}"
+add_setting readTimeoutSeconds "${CODIQO_IN_API_READ_TIMEOUT:-}"
+add_setting firstParentOnly "${CODIQO_IN_FIRST_PARENT_ONLY:-true}"
+add_setting excludeRevertedCommits "${CODIQO_IN_EXCLUDE_REVERTED_COMMITS:-true}"
+add_setting includeBranches "${CODIQO_IN_INCLUDE_BRANCHES:-}"
+add_setting includeAuthorEmails "${CODIQO_IN_INCLUDE_AUTHOR_EMAILS:-}"
+add_setting excludeAuthorEmails "${CODIQO_IN_EXCLUDE_AUTHOR_EMAILS:-}"
+add_setting skipOnBuildFailure "${CODIQO_IN_SKIP_ON_BUILD_FAILURE:-true}"
+add_setting failOnUninstrumentedModule "${CODIQO_IN_FAIL_ON_UNINSTRUMENTED_MODULE:-true}"
+add_setting testFailureHoldShare "${CODIQO_IN_TEST_FAILURE_HOLD_SHARE:-}"
+add_setting testFailureHoldMinTests "${CODIQO_IN_TEST_FAILURE_HOLD_MIN_TESTS:-}"
+add_setting testTimeoutMinutes "${CODIQO_TEST_TIMEOUT_MINUTES}"
+add_setting perTestTimeoutMinutes "${CODIQO_PER_TEST_TIMEOUT_MINUTES}"
+add_setting ignoreCoverage "${CODIQO_IN_IGNORE_COVERAGE:-false}"
+add_setting ignoreComplexity "${CODIQO_IN_IGNORE_COMPLEXITY:-false}"
+add_setting ignoreCpd "${CODIQO_IN_IGNORE_CPD:-false}"
+add_setting ignoreDiagnostics "${CODIQO_IN_IGNORE_DIAGNOSTICS:-false}"
+add_setting hotspots "${hotspots}"
+add_setting hotspotsCommitId "${hotspots_commit}"
+add_setting dumpAnalysis "${CODIQO_IN_DUMP_ANALYSIS:-true}"
+add_setting outputDirectory "${CODIQO_IN_ANALYSIS_OUTPUT_DIRECTORY:-}"
+add_setting javaHome "${CODIQO_IN_JAVA_HOME:-}"
+add_setting jdtlsJavaHome "${CODIQO_IN_JDTLS_JAVA_HOME:-}"
+add_setting jdtlsVersion "${CODIQO_IN_JDTLS_VERSION:-}"
+add_setting jdtlsUseSnapshot "${CODIQO_IN_JDTLS_USE_SNAPSHOT:-false}"
+add_setting jdtUseSharedIndex "${CODIQO_IN_JDT_USE_SHARED_INDEX:-true}"
+add_setting jdtIncludeDecompiledSources "${CODIQO_IN_JDT_INCLUDE_DECOMPILED_SOURCES:-false}"
+add_setting jdtLombokAgent "${CODIQO_IN_JDT_LOMBOK_AGENT:-true}"
+add_setting failOnJdtlsError "${CODIQO_IN_FAIL_ON_JDTLS_ERROR:-false}"
+add_setting importTimeoutMinutes "${CODIQO_IN_IMPORT_TIMEOUT_MINUTES:-}"
+add_setting lspQueryTimeoutSeconds "${CODIQO_IN_LSP_QUERY_TIMEOUT_SECONDS:-}"
+add_setting pmdRules "${CODIQO_IN_PMD_RULES:-}"
+add_setting pmdMinPriority "${CODIQO_IN_PMD_MIN_PRIORITY:-}"
+add_setting spotbugsPriorityThreshold "${CODIQO_IN_SPOTBUGS_PRIORITY_THRESHOLD:-}"
+add_setting spotbugsOmitVisitors "${CODIQO_IN_SPOTBUGS_OMIT_VISITORS:-}"
+add_setting cpdMinimumTileSize "${CODIQO_IN_CPD_MINIMUM_TILE_SIZE:-}"
+add_setting cpdIgnoreIdentifiers "${CODIQO_IN_CPD_IGNORE_IDENTIFIERS:-}"
+add_setting diffContextLines "${CODIQO_IN_DIFF_CONTEXT_LINES:-}"
+add_setting buildErrorCaptureLimit "${CODIQO_IN_BUILD_ERROR_CAPTURE_LIMIT:-}"
+add_setting moveDetectionEnabled "${CODIQO_IN_MOVE_DETECTION:-true}"
+add_setting moveSimilarityThreshold "${CODIQO_IN_MOVE_SIMILARITY_THRESHOLD:-}"
+add_setting movedLineCoefficient "${CODIQO_IN_MOVED_LINE_COEFFICIENT:-}"
+add_setting driverScoreCapMultiplier "${CODIQO_IN_DRIVER_SCORE_CAP_MULTIPLIER:-}"
+add_setting driverScoreCapDryRun "${CODIQO_IN_DRIVER_SCORE_CAP_DRY_RUN:-false}"
+add_setting driverFactorMaxDeviation "${CODIQO_IN_DRIVER_FACTOR_MAX_DEVIATION:-}"
+add_setting maxRequests "${CODIQO_IN_MAX_REQUESTS:-}"
+add_setting maxRequestsPerHost "${CODIQO_IN_MAX_REQUESTS_PER_HOST:-}"
+add_setting llm.autoDiscoveryAgentInstructions "${CODIQO_IN_AGENT_INSTRUCTIONS:-true}"
+add_setting llm.conventionFiles "${CODIQO_IN_AGENT_INSTRUCTION_FILES:-}"
+add_setting llm.conventionFilesMaxChars "${CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS:-}"
+#
+# Every analysed commit is reviewed in that commit's own checkout (the Maven goal's analysis clone,
+# the workspace under Gradle), so a backlog pays for one review per commit. The proxy is reached with
+# the same API key, and each review's trace (every agent session and tool call) lands beside the
+# logs, so it is redacted and uploaded with them.
+#
+if [ "${CODIQO_REVIEW:-false}" = "true" ]; then
+    add_setting review true
+    add_setting review.executable "${CODIQO_OPENCODE_EXECUTABLE:?the OpenCode install step did not run}"
+    add_setting review.traceDirectory "$CODIQO_LOGS_DIR/review-trace"
+    add_setting review.timeoutMinutes "${CODIQO_REVIEW_TIMEOUT_MINUTES:-}"
+    add_setting review.temperature "${CODIQO_IN_REVIEW_TEMPERATURE:-}"
+    add_setting review.topP "${CODIQO_IN_REVIEW_TOP_P:-}"
+else
+    add_setting review false
+fi
+
+#
 # Who checks out the commit differs by build tool, and it is not a style choice. The Maven goal
 # clones the repository itself and builds the commit in a temporary tree, so the workspace is
 # never touched. A Gradle build reads its whole model at startup, so it cannot re-target itself at
@@ -309,60 +391,9 @@ for commit in "${commits[@]}"; do
         for task in ${CODIQO_GRADLE_TASKS}; do cmd+=("$task"); done
         set +f
         cmd+=("codiqoSubmitAnalysis")
+        for setting in "${settings[@]}"; do cmd+=("-P${setting}"); done
         cmd+=("-Pcodiqo.commitId=${commit}")
-        cmd+=("-Pcodiqo.apiKey=env:CODIQO_API_KEY")
-        cmd+=("-Pcodiqo.firstParentOnly=${CODIQO_IN_FIRST_PARENT_ONLY:-true}")
-        cmd+=("-Pcodiqo.excludeRevertedCommits=${CODIQO_IN_EXCLUDE_REVERTED_COMMITS:-true}")
-        cmd+=("-Pcodiqo.ignoreCoverage=${CODIQO_IN_IGNORE_COVERAGE:-false}")
-        cmd+=("-Pcodiqo.ignoreComplexity=${CODIQO_IN_IGNORE_COMPLEXITY:-false}")
-        cmd+=("-Pcodiqo.ignoreCpd=${CODIQO_IN_IGNORE_CPD:-false}")
-        cmd+=("-Pcodiqo.hotspots=${hotspots}")
-        cmd+=("-Pcodiqo.hotspotsCommitId=${hotspots_commit}")
-        cmd+=("-Pcodiqo.ignoreDiagnostics=${CODIQO_IN_IGNORE_DIAGNOSTICS:-false}")
-        cmd+=("-Pcodiqo.skipOnBuildFailure=${CODIQO_IN_SKIP_ON_BUILD_FAILURE:-true}")
-        cmd+=("-Pcodiqo.failOnUninstrumentedModule=${CODIQO_IN_FAIL_ON_UNINSTRUMENTED_MODULE:-true}")
-        if [ -n "${CODIQO_IN_TEST_FAILURE_HOLD_SHARE:-}" ]; then cmd+=("-Pcodiqo.testFailureHoldShare=${CODIQO_IN_TEST_FAILURE_HOLD_SHARE}"); fi
-        if [ -n "${CODIQO_IN_TEST_FAILURE_HOLD_MIN_TESTS:-}" ]; then cmd+=("-Pcodiqo.testFailureHoldMinTests=${CODIQO_IN_TEST_FAILURE_HOLD_MIN_TESTS}"); fi
-        cmd+=("-Pcodiqo.failOnJdtlsError=${CODIQO_IN_FAIL_ON_JDTLS_ERROR:-false}")
-        cmd+=("-Pcodiqo.jdtUseSharedIndex=${CODIQO_IN_JDT_USE_SHARED_INDEX:-true}")
-        cmd+=("-Pcodiqo.jdtIncludeDecompiledSources=${CODIQO_IN_JDT_INCLUDE_DECOMPILED_SOURCES:-false}")
-        cmd+=("-Pcodiqo.jdtLombokAgent=${CODIQO_IN_JDT_LOMBOK_AGENT:-true}")
-        cmd+=("-Pcodiqo.jdtlsUseSnapshot=${CODIQO_IN_JDTLS_USE_SNAPSHOT:-false}")
-        cmd+=("-Pcodiqo.testTimeoutMinutes=${CODIQO_TEST_TIMEOUT_MINUTES}")
-        cmd+=("-Pcodiqo.perTestTimeoutMinutes=${CODIQO_PER_TEST_TIMEOUT_MINUTES}")
-
-        if [ -n "${CODIQO_IN_API_URL:-}" ]; then cmd+=("-Pcodiqo.apiUrl=${CODIQO_IN_API_URL}"); fi
-        if [ -n "${CODIQO_IN_EXCLUDE_AUTHOR_EMAILS:-}" ]; then cmd+=("-Pcodiqo.excludeAuthorEmails=${CODIQO_IN_EXCLUDE_AUTHOR_EMAILS}"); fi
-        if [ -n "${CODIQO_IN_INCLUDE_AUTHOR_EMAILS:-}" ]; then cmd+=("-Pcodiqo.includeAuthorEmails=${CODIQO_IN_INCLUDE_AUTHOR_EMAILS}"); fi
-        if [ -n "${CODIQO_IN_INCLUDE_BRANCHES:-}" ]; then cmd+=("-Pcodiqo.includeBranches=${CODIQO_IN_INCLUDE_BRANCHES}"); fi
-        if [ -n "${CODIQO_IN_JAVA_HOME:-}" ]; then cmd+=("-Pcodiqo.javaHome=${CODIQO_IN_JAVA_HOME}"); fi
-        if [ -n "${CODIQO_IN_JDTLS_JAVA_HOME:-}" ]; then cmd+=("-Pcodiqo.jdtlsJavaHome=${CODIQO_IN_JDTLS_JAVA_HOME}"); fi
-        #
-        # The Gradle plugin reviews the checked-out commit beside the build, with the same settings
-        # as Maven passed as project properties.
-        #
-        if [ "${CODIQO_REVIEW:-false}" = "true" ]; then
-            cmd+=("-Pcodiqo.review=true")
-            cmd+=("-Pcodiqo.review.executable=${CODIQO_OPENCODE_EXECUTABLE:?the OpenCode install step did not run}")
-            cmd+=("-Pcodiqo.review.traceDirectory=$CODIQO_LOGS_DIR/review-trace")
-            if [ -n "${CODIQO_REVIEW_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Pcodiqo.review.timeoutMinutes=${CODIQO_REVIEW_TIMEOUT_MINUTES}"); fi
-            if [ -n "${CODIQO_IN_REVIEW_TEMPERATURE:-}" ]; then cmd+=("-Pcodiqo.review.temperature=${CODIQO_IN_REVIEW_TEMPERATURE}"); fi
-            if [ -n "${CODIQO_IN_REVIEW_TOP_P:-}" ]; then cmd+=("-Pcodiqo.review.topP=${CODIQO_IN_REVIEW_TOP_P}"); fi
-        else
-            cmd+=("-Pcodiqo.review=false")
-        fi
-        if [ -n "${CODIQO_IN_JDTLS_VERSION:-}" ]; then cmd+=("-Pcodiqo.jdtlsVersion=${CODIQO_IN_JDTLS_VERSION}"); fi
-        if [ -n "${CODIQO_IN_IMPORT_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Pcodiqo.importTimeoutMinutes=${CODIQO_IN_IMPORT_TIMEOUT_MINUTES}"); fi
-        if [ -n "${CODIQO_IN_API_CONNECT_TIMEOUT:-}" ]; then cmd+=("-Pcodiqo.connectTimeoutSeconds=${CODIQO_IN_API_CONNECT_TIMEOUT}"); fi
-        if [ -n "${CODIQO_IN_API_READ_TIMEOUT:-}" ]; then cmd+=("-Pcodiqo.readTimeoutSeconds=${CODIQO_IN_API_READ_TIMEOUT}"); fi
         if [ -n "${CODIQO_IN_ANALYSIS_MAX_HEAP:-}" ]; then cmd+=("-Pcodiqo.analysisMaxHeap=${CODIQO_IN_ANALYSIS_MAX_HEAP}"); fi
-        #
-        # Both of these are read from project properties by the Gradle plugin exactly as the Maven
-        # mojo reads them from system properties, so leaving them off this branch made two supported
-        # inputs silently inert on Gradle alone.
-        #
-        if [ -n "${CODIQO_IN_LSP_QUERY_TIMEOUT_SECONDS:-}" ]; then cmd+=("-Pcodiqo.lspQueryTimeoutSeconds=${CODIQO_IN_LSP_QUERY_TIMEOUT_SECONDS}"); fi
-        if [ -n "${CODIQO_IN_ANALYSIS_OUTPUT_DIRECTORY:-}" ]; then cmd+=("-Pcodiqo.outputDirectory=${CODIQO_IN_ANALYSIS_OUTPUT_DIRECTORY}"); fi
 
         #
         # The plugin's build service appends project progress here, in the same format the Maven
@@ -402,82 +433,18 @@ for commit in "${commits[@]}"; do
     cmd+=(${extra_args[@]+"${extra_args[@]}"})
     cmd+=(${user_props[@]+"${user_props[@]}"})
     cmd+=("${plugin}:submit-commit-analysis")
+    for setting in "${settings[@]}"; do cmd+=("-D${setting}"); done
     cmd+=("-Dcodiqo.commitId=${commit}")
-    cmd+=("-Dcodiqo.apiKey=env:CODIQO_API_KEY")
-    cmd+=("-Dcodiqo.firstParentOnly=${CODIQO_IN_FIRST_PARENT_ONLY:-true}")
-    cmd+=("-Dcodiqo.excludeRevertedCommits=${CODIQO_IN_EXCLUDE_REVERTED_COMMITS:-true}")
-    cmd+=("-Dcodiqo.ignoreCoverage=${CODIQO_IN_IGNORE_COVERAGE:-false}")
+    #
+    # Only the Maven goal forks its own build of the commit, so only it has a time machine, a build
+    # deadline, a Maven home and options for that fork, and source jars to drop before the language
+    # server imports the project.
+    #
     cmd+=("-Dcodiqo.timeMachineEnabled=${CODIQO_IN_TIME_MACHINE:-true}")
-    cmd+=("-Dcodiqo.dumpAnalysis=${CODIQO_IN_DUMP_ANALYSIS:-true}")
-    cmd+=("-Dcodiqo.llm.autoDiscoveryAgentInstructions=${CODIQO_IN_AGENT_INSTRUCTIONS:-true}")
-    cmd+=("-Dcodiqo.skipOnBuildFailure=${CODIQO_IN_SKIP_ON_BUILD_FAILURE:-true}")
-    cmd+=("-Dcodiqo.failOnUninstrumentedModule=${CODIQO_IN_FAIL_ON_UNINSTRUMENTED_MODULE:-true}")
-    if [ -n "${CODIQO_IN_TEST_FAILURE_HOLD_SHARE:-}" ]; then cmd+=("-Dcodiqo.testFailureHoldShare=${CODIQO_IN_TEST_FAILURE_HOLD_SHARE}"); fi
-    if [ -n "${CODIQO_IN_TEST_FAILURE_HOLD_MIN_TESTS:-}" ]; then cmd+=("-Dcodiqo.testFailureHoldMinTests=${CODIQO_IN_TEST_FAILURE_HOLD_MIN_TESTS}"); fi
-    cmd+=("-Dcodiqo.failOnJdtlsError=${CODIQO_IN_FAIL_ON_JDTLS_ERROR:-false}")
-    cmd+=("-Dcodiqo.ignoreComplexity=${CODIQO_IN_IGNORE_COMPLEXITY:-false}")
-    cmd+=("-Dcodiqo.ignoreCpd=${CODIQO_IN_IGNORE_CPD:-false}")
-    cmd+=("-Dcodiqo.hotspots=${hotspots}")
-    cmd+=("-Dcodiqo.hotspotsCommitId=${hotspots_commit}")
-    cmd+=("-Dcodiqo.ignoreDiagnostics=${CODIQO_IN_IGNORE_DIAGNOSTICS:-false}")
-    cmd+=("-Dcodiqo.moveDetectionEnabled=${CODIQO_IN_MOVE_DETECTION:-true}")
-    cmd+=("-Dcodiqo.driverScoreCapDryRun=${CODIQO_IN_DRIVER_SCORE_CAP_DRY_RUN:-false}")
-    cmd+=("-Dcodiqo.jdtUseSharedIndex=${CODIQO_IN_JDT_USE_SHARED_INDEX:-true}")
-    cmd+=("-Dcodiqo.jdtIncludeDecompiledSources=${CODIQO_IN_JDT_INCLUDE_DECOMPILED_SOURCES:-false}")
-    cmd+=("-Dcodiqo.jdtLombokAgent=${CODIQO_IN_JDT_LOMBOK_AGENT:-true}")
-    cmd+=("-Dcodiqo.jdtlsUseSnapshot=${CODIQO_IN_JDTLS_USE_SNAPSHOT:-false}")
     cmd+=("-Dcodiqo.buildTimeoutMinutes=${CODIQO_BUILD_TIMEOUT_MINUTES}")
-    cmd+=("-Dcodiqo.testTimeoutMinutes=${CODIQO_TEST_TIMEOUT_MINUTES}")
-    cmd+=("-Dcodiqo.perTestTimeoutMinutes=${CODIQO_PER_TEST_TIMEOUT_MINUTES}")
-
-    if [ -n "${CODIQO_IN_API_URL:-}" ]; then cmd+=("-Dcodiqo.apiUrl=${CODIQO_IN_API_URL}"); fi
-    if [ -n "${CODIQO_IN_EXCLUDE_AUTHOR_EMAILS:-}" ]; then cmd+=("-Dcodiqo.excludeAuthorEmails=${CODIQO_IN_EXCLUDE_AUTHOR_EMAILS}"); fi
-    if [ -n "${CODIQO_IN_INCLUDE_AUTHOR_EMAILS:-}" ]; then cmd+=("-Dcodiqo.includeAuthorEmails=${CODIQO_IN_INCLUDE_AUTHOR_EMAILS}"); fi
-    if [ -n "${CODIQO_IN_JAVA_HOME:-}" ]; then cmd+=("-Dcodiqo.javaHome=${CODIQO_IN_JAVA_HOME}"); fi
-    if [ -n "${CODIQO_IN_JDTLS_JAVA_HOME:-}" ]; then cmd+=("-Dcodiqo.jdtlsJavaHome=${CODIQO_IN_JDTLS_JAVA_HOME}"); fi
     if [ -n "${CODIQO_IN_MAVEN_HOME:-}" ]; then cmd+=("-Dcodiqo.mavenHome=${CODIQO_IN_MAVEN_HOME}"); fi
-    if [ -n "${CODIQO_IN_JDTLS_VERSION:-}" ]; then cmd+=("-Dcodiqo.jdtlsVersion=${CODIQO_IN_JDTLS_VERSION}"); fi
-    if [ -n "${CODIQO_IN_IMPORT_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Dcodiqo.importTimeoutMinutes=${CODIQO_IN_IMPORT_TIMEOUT_MINUTES}"); fi
-    if [ -n "${CODIQO_IN_API_CONNECT_TIMEOUT:-}" ]; then cmd+=("-Dcodiqo.connectTimeoutSeconds=${CODIQO_IN_API_CONNECT_TIMEOUT}"); fi
-    if [ -n "${CODIQO_IN_API_READ_TIMEOUT:-}" ]; then cmd+=("-Dcodiqo.readTimeoutSeconds=${CODIQO_IN_API_READ_TIMEOUT}"); fi
-    if [ -n "${CODIQO_IN_INCLUDE_BRANCHES:-}" ]; then cmd+=("-Dcodiqo.includeBranches=${CODIQO_IN_INCLUDE_BRANCHES}"); fi
-    if [ -n "${CODIQO_IN_PMD_RULES:-}" ]; then cmd+=("-Dcodiqo.pmdRules=${CODIQO_IN_PMD_RULES}"); fi
-    if [ -n "${CODIQO_IN_PMD_MIN_PRIORITY:-}" ]; then cmd+=("-Dcodiqo.pmdMinPriority=${CODIQO_IN_PMD_MIN_PRIORITY}"); fi
-    if [ -n "${CODIQO_IN_SPOTBUGS_PRIORITY_THRESHOLD:-}" ]; then cmd+=("-Dcodiqo.spotbugsPriorityThreshold=${CODIQO_IN_SPOTBUGS_PRIORITY_THRESHOLD}"); fi
-    if [ -n "${CODIQO_IN_SPOTBUGS_OMIT_VISITORS:-}" ]; then cmd+=("-Dcodiqo.spotbugsOmitVisitors=${CODIQO_IN_SPOTBUGS_OMIT_VISITORS}"); fi
-    if [ -n "${CODIQO_IN_CPD_MINIMUM_TILE_SIZE:-}" ]; then cmd+=("-Dcodiqo.cpdMinimumTileSize=${CODIQO_IN_CPD_MINIMUM_TILE_SIZE}"); fi
-    if [ -n "${CODIQO_IN_CPD_IGNORE_IDENTIFIERS:-}" ]; then cmd+=("-Dcodiqo.cpdIgnoreIdentifiers=${CODIQO_IN_CPD_IGNORE_IDENTIFIERS}"); fi
     if [ -n "${CODIQO_IN_FORK_MAVEN_OPTS:-}" ]; then cmd+=("-Dcodiqo.forkMavenOpts=${CODIQO_IN_FORK_MAVEN_OPTS}"); fi
-    if [ -n "${CODIQO_IN_DIFF_CONTEXT_LINES:-}" ]; then cmd+=("-Dcodiqo.diffContextLines=${CODIQO_IN_DIFF_CONTEXT_LINES}"); fi
-    if [ -n "${CODIQO_IN_BUILD_ERROR_CAPTURE_LIMIT:-}" ]; then cmd+=("-Dcodiqo.buildErrorCaptureLimit=${CODIQO_IN_BUILD_ERROR_CAPTURE_LIMIT}"); fi
-    if [ -n "${CODIQO_IN_MOVE_SIMILARITY_THRESHOLD:-}" ]; then cmd+=("-Dcodiqo.moveSimilarityThreshold=${CODIQO_IN_MOVE_SIMILARITY_THRESHOLD}"); fi
-    if [ -n "${CODIQO_IN_MOVED_LINE_COEFFICIENT:-}" ]; then cmd+=("-Dcodiqo.movedLineCoefficient=${CODIQO_IN_MOVED_LINE_COEFFICIENT}"); fi
-    if [ -n "${CODIQO_IN_DRIVER_SCORE_CAP_MULTIPLIER:-}" ]; then cmd+=("-Dcodiqo.driverScoreCapMultiplier=${CODIQO_IN_DRIVER_SCORE_CAP_MULTIPLIER}"); fi
-    if [ -n "${CODIQO_IN_DRIVER_FACTOR_MAX_DEVIATION:-}" ]; then cmd+=("-Dcodiqo.driverFactorMaxDeviation=${CODIQO_IN_DRIVER_FACTOR_MAX_DEVIATION}"); fi
-    if [ -n "${CODIQO_IN_MAX_REQUESTS:-}" ]; then cmd+=("-Dcodiqo.maxRequests=${CODIQO_IN_MAX_REQUESTS}"); fi
-    if [ -n "${CODIQO_IN_MAX_REQUESTS_PER_HOST:-}" ]; then cmd+=("-Dcodiqo.maxRequestsPerHost=${CODIQO_IN_MAX_REQUESTS_PER_HOST}"); fi
-    if [ -n "${CODIQO_IN_LSP_QUERY_TIMEOUT_SECONDS:-}" ]; then cmd+=("-Dcodiqo.lspQueryTimeoutSeconds=${CODIQO_IN_LSP_QUERY_TIMEOUT_SECONDS}"); fi
     if [ -n "${CODIQO_IN_JDT_SOURCE_EXCLUSIONS:-}" ]; then cmd+=("-Dcodiqo.jdtSourceExclusions=${CODIQO_IN_JDT_SOURCE_EXCLUSIONS}"); fi
-    if [ -n "${CODIQO_IN_ANALYSIS_OUTPUT_DIRECTORY:-}" ]; then cmd+=("-Dcodiqo.outputDirectory=${CODIQO_IN_ANALYSIS_OUTPUT_DIRECTORY}"); fi
-    if [ -n "${CODIQO_IN_AGENT_INSTRUCTION_FILES:-}" ]; then cmd+=("-Dcodiqo.llm.conventionFiles=${CODIQO_IN_AGENT_INSTRUCTION_FILES}"); fi
-    if [ -n "${CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS:-}" ]; then cmd+=("-Dcodiqo.llm.conventionFilesMaxChars=${CODIQO_IN_AGENT_INSTRUCTIONS_MAX_CHARS}"); fi
-
-    #
-    # Every analysed commit is reviewed in the analysis clone, which holds that commit as its clean
-    # HEAD, so a backlog pays for one review per commit. The proxy is reached with the same API key.
-    #
-    if [ "${CODIQO_REVIEW:-false}" = "true" ]; then
-        cmd+=("-Dcodiqo.review=true")
-        cmd+=("-Dcodiqo.review.executable=${CODIQO_OPENCODE_EXECUTABLE:?the OpenCode install step did not run}")
-        # Each review's trace (every agent session and tool call) lands beside the logs, so it is
-        # redacted and uploaded with them.
-        cmd+=("-Dcodiqo.review.traceDirectory=$CODIQO_LOGS_DIR/review-trace")
-        if [ -n "${CODIQO_REVIEW_TIMEOUT_MINUTES:-}" ]; then cmd+=("-Dcodiqo.review.timeoutMinutes=${CODIQO_REVIEW_TIMEOUT_MINUTES}"); fi
-        if [ -n "${CODIQO_IN_REVIEW_TEMPERATURE:-}" ]; then cmd+=("-Dcodiqo.review.temperature=${CODIQO_IN_REVIEW_TEMPERATURE}"); fi
-        if [ -n "${CODIQO_IN_REVIEW_TOP_P:-}" ]; then cmd+=("-Dcodiqo.review.topP=${CODIQO_IN_REVIEW_TOP_P}"); fi
-    else
-        cmd+=("-Dcodiqo.review=false")
-    fi
 
     #
     # The forked build's event spy appends module progress here for the heartbeat to report.

@@ -45,7 +45,7 @@ inputs:
     required: false
     default: ''
   build-tool:
-    description: 'Which build tool drives the analysis: "maven" or "gradle". Gradle support does not cover the time machine or build-failure capture; see the Gradle section of the README.'
+    description: 'Which build tool drives the analysis: "maven" or "gradle". Gradle has no time machine, and ignores the inputs about the Maven goal''s own build; see the Gradle section of the README.'
     required: false
     default: 'maven'
   gradle-command:
@@ -57,7 +57,7 @@ inputs:
     required: false
     default: 'test'
   gradle-project-properties:
-    description: 'Newline-separated key=value pairs passed as -Pkey=value to every Gradle invocation, the Gradle counterpart of maven-user-properties. Never put secrets here; they would appear on the command line.'
+    description: 'Newline-separated key=value pairs passed as -Pkey=value to every Gradle invocation, the Gradle counterpart of maven-user-properties. Never put secrets here; they would appear on the command line. A Codiqo setting takes the same name as in maven-user-properties, such as codiqo.review.timeoutMinutes.'
     required: false
     default: ''
   gradle-args:
@@ -77,7 +77,7 @@ inputs:
     required: false
     default: '3.9.16'
   maven-home:
-    description: 'Maven home for the forked per-commit build (-Dcodiqo.mavenHome).'
+    description: 'Maven home for the forked per-commit build (-Dcodiqo.mavenHome). Maven only.'
     required: false
     default: ''
   jdtls-version:
@@ -129,7 +129,7 @@ inputs:
     required: false
     default: ''
   build-timeout-minutes:
-    description: 'Limit for the forked build of a single commit (-Dcodiqo.buildTimeoutMinutes). It has to fire before per-commit-timeout, or the outer deadline kills the analysis before codiqo can record the commit as a build failure. Left empty it is three quarters of per-commit-timeout; a value that would not fit is clamped back to that, with a warning. The default of 90 fits under the default per-commit-timeout with the review on or off.'
+    description: 'Limit for the forked build of a single commit (-Dcodiqo.buildTimeoutMinutes). It has to fire before per-commit-timeout, or the outer deadline kills the analysis before codiqo can record the commit as a build failure. Left empty it is three quarters of per-commit-timeout; a value that would not fit is clamped back to that, with a warning. The default of 90 fits under the default per-commit-timeout with the review on or off. Maven only: under Gradle the build is the action''s own command, held to per-commit-timeout.'
     required: false
     default: '90'
   test-timeout-minutes:
@@ -155,7 +155,7 @@ inputs:
 
   # -------------------------------------------------------------------------------- maven wiring
   settings-xml:
-    description: 'Complete settings.xml content. Written to ~/.m2/settings.xml, the only location the language server''s embedded m2e reads: passing -s elsewhere does not reach it, and an m2e that cannot resolve your parent POMs yields an analysis with zero callers. Use this to supply private repositories and credentials.'
+    description: 'Complete settings.xml content. Written to ~/.m2/settings.xml, the only location the language server''s embedded m2e reads: passing -s elsewhere does not reach it, and an m2e that cannot resolve your parent POMs yields an analysis with zero callers. Use this to supply private repositories and credentials. Maven only.'
     required: false
     default: ''
   maven-user-properties:
@@ -191,7 +191,7 @@ inputs:
     required: false
     default: ''
   resolve-dependencies:
-    description: 'Run dependency:go-offline once before analysing, to warm the local repository and surface an unreachable repository as one clear warning; the run continues either way. Off by default because go-offline is imperfect: it misses dependencies reachable only through a plugin, and some reactors make it fail outright.'
+    description: 'Run dependency:go-offline once before analysing, to warm the local repository and surface an unreachable repository as one clear warning; the run continues either way. Off by default because go-offline is imperfect: it misses dependencies reachable only through a plugin, and some reactors make it fail outright. Maven only.'
     required: false
     default: 'false'
 
@@ -205,7 +205,7 @@ inputs:
     required: false
     default: 'false'
   time-machine:
-    description: 'Load the Codiqo time-machine core extension into the host Maven, so a historical commit resolves the snapshot dependencies it had at the time rather than the latest ones.'
+    description: 'Load the Codiqo time-machine core extension into the host Maven, so a historical commit resolves the snapshot dependencies it had at the time rather than the latest ones. Maven only.'
     required: false
     default: 'true'
   dump-analysis:
@@ -333,7 +333,7 @@ inputs:
     required: false
     default: 'true'
   jdt-source-exclusions:
-    description: 'Comma-separated groupId prefixes whose -sources.jar is removed from the local repository before the language server imports the project (-Dcodiqo.jdtSourceExclusions). REPLACES the default list rather than adding to it. The default covers the Scala and Kotlin dependency families whose source jars hang or crash the import; extend it (repeating the defaults you still want) if a dependency of yours ships non-Java sources and the import stalls.'
+    description: 'Comma-separated groupId prefixes whose -sources.jar is removed from the local repository before the language server imports the project (-Dcodiqo.jdtSourceExclusions). REPLACES the default list rather than adding to it. The default covers the Scala and Kotlin dependency families whose source jars hang or crash the import; extend it (repeating the defaults you still want) if a dependency of yours ships non-Java sources and the import stalls. Maven only.'
     required: false
     default: ''
   max-requests:

@@ -68,7 +68,7 @@ built a Java model (see Troubleshooting).
 ## Requirements
 
 - **A Maven or Gradle project.** Maven is the default; set `build-tool: gradle` for a Gradle
-  build, and read the Gradle section below first — it is not yet at full parity.
+  build, and read the Gradle section below first — it has no time machine.
 - **A Linux runner.** The status heartbeat reads `/proc` and the per-commit deadline uses GNU
   `timeout`. Other platforms degrade rather than fail, but are untested.
 - **Full git history** — `fetch-depth: 0`. Codiqo walks history to find commits needing analysis
@@ -186,22 +186,22 @@ tests under Gradle, set `gradle-tasks` to something cheaper (`classes`) or to `'
 Gradle release refuses a JDK newer than it knows about. Backfilling a window that spans a Gradle
 upgrade may need `java-version` lowered to what the oldest wrapper accepts.
 
-**Several features are Maven-only.** The time machine (`time-machine` is ignored) and structured
-build-failure capture: Gradle cannot tell a dependency failure or a timeout from a broken build, so with
-the review on it scores every failed build from the review. Historical commits
-resolve today's snapshot dependencies rather than the ones current at the time. The Gradle plugin
-also has no equivalent of the analysis-tuning inputs, so these are accepted and ignored under
-`build-tool: gradle`: `settings-xml`, `dump-analysis`, `move-detection`, `move-similarity-threshold`,
-`moved-line-coefficient`, `driver-score-cap-*`, `driver-factor-max-deviation`, `pmd-rules`,
-`pmd-min-priority`, `spotbugs-*`, `cpd-minimum-tile-size`, `cpd-ignore-identifiers`, `diff-context-lines`,
-`build-error-capture-limit`, `max-requests*`, `jdt-source-exclusions`, `index-batch-size`,
-`agent-instruction*`, `build-timeout-minutes` and the local review (`review` is skipped, with a line in
-the log, and `review-*` and `opencode-version` with it). Scores are therefore not comparable across the two
-build tools when you have tuned any of them.
+**A few inputs are Maven-only.** There is no time machine (`time-machine` is ignored), so a historical
+commit resolves today's snapshot dependencies rather than the ones current at the time. The inputs about
+the Maven goal's own fork of the build are ignored too: `settings-xml`, the `maven-*` inputs,
+`fork-maven-opts`, `resolve-dependencies`, `jdt-source-exclusions` and `build-timeout-minutes` (the
+Gradle build is the action's own command, held to `per-commit-timeout` and, test task by test task, to
+`test-timeout-minutes`), and so is `index-batch-size`. Every other input, the local review and the
+analysis-tuning inputs included, reaches the Gradle plugin as a project property of the same name the
+Maven goal reads as a user property (`pmd-rules` is `codiqo.pmdRules` on both), so tuning one changes both
+build tools alike. A failed build is classified as on Maven, a dependency or download failure as the
+environment's and a compiler crash as codiqo's, except that Gradle cannot report a build that timed out or
+a crash of javac itself; with the review on, those are scored as the author's broken build.
 
 Gradle-specific inputs: `gradle-command`, `gradle-tasks`, `gradle-project-properties` (the
-counterpart of `maven-user-properties`), `gradle-args` (the counterpart of `maven-args`, which is
-never passed to Gradle) and `analysis-max-heap`. The last one matters: the analysis runs in its own
+counterpart of `maven-user-properties`: a Codiqo setting takes the same name in both, such as
+`codiqo.review.timeoutMinutes`, and a value the plugin cannot read fails the build naming it),
+`gradle-args` (the counterpart of `maven-args`, which is never passed to Gradle) and `analysis-max-heap`. The last one matters: the analysis runs in its own
 JVM, so the project's `org.gradle.jvmargs` does not size it, and an `-Xmx` in `maven-opts` does not
 reach it either. It defaults to 8g, which is worth lowering on a standard runner.
 
@@ -275,7 +275,7 @@ every commit is excluded. There are no other review switches. It works with Mave
 | `analysis-max-heap` | `''` (plugin default `8g`) | Heap for the forked analysis JVM. The project's `org.gradle.jvmargs` does not size it. Gradle only. |
 | `maven-command` | `auto` | `auto` prefers `./mvnw`, else `mvn`. |
 | `maven-version` | `3.9.16` | Apache Maven installed from Maven Central (SHA-512 checked) and put first on PATH, so every run builds with the same Maven. The forked build inherits it unless `maven-home` is set. A project's `./mvnw` still wins under `maven-command: auto`. `''` uses the runner's Maven. Maven only. |
-| `maven-home` | `''` | Maven home for the forked build. |
+| `maven-home` | `''` | Maven home for the forked build. Maven only. |
 | `jdtls-version` | `''` | Language server version override. |
 | `jdtls-use-snapshot` | `false` | Resolve the language server from Eclipse's snapshot channel; `jdtls-version` is then ignored. |
 | `cache` | `auto` | `actions/setup-java` cache; `auto` follows `build-tool`. Name it explicitly (`maven`, `gradle`) or set `''` to disable. A `maven` cache on a Gradle-only repository fails the job: `setup-java` errors when its `**/pom.xml` glob matches nothing. |
@@ -298,7 +298,7 @@ every commit is excluded. There are no other review switches. It works with Mave
 | Input | Default | Description |
 | --- | --- | --- |
 | `per-commit-timeout` | `''` | `30m`, `1h`, `90m`, `2h`, or raw minutes. The outer deadline everything else is fitted under. Empty is `review-timeout-minutes` plus 30 with `review` on (180 by default) and `2h` with it off; with `review` on, a smaller value is raised to that, with a warning. |
-| `build-timeout-minutes` | `90` | Forked build of one commit. It must fit inside three quarters of `per-commit-timeout`, so a larger value is clamped back to that with a warning; the default fits with `review` on or off. Empty uses that three quarters. |
+| `build-timeout-minutes` | `90` | Forked build of one commit. It must fit inside three quarters of `per-commit-timeout`, so a larger value is clamped back to that with a warning; the default fits with `review` on or off. Empty uses that three quarters. Maven only. |
 | `test-timeout-minutes` | `30` | Test phase of the forked build. Clamped to three quarters of the build timeout. |
 | `per-test-timeout` | `15m` | One JUnit 5 test method; `off` disables. Capped at 15 minutes and at half the test-phase budget. |
 | `import-timeout-minutes` | `15` | Language server project import. Raise for a large reactor. |
@@ -316,7 +316,7 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 
 | Input | Default | Description |
 | --- | --- | --- |
-| `settings-xml` | `''` | Complete `settings.xml` content, written to `~/.m2/settings.xml`. |
+| `settings-xml` | `''` | Complete `settings.xml` content, written to `~/.m2/settings.xml`. Maven only. |
 | `maven-user-properties` | `''` | Newline `key=value`, passed as `-Dkey=value`. Never secrets. |
 | `maven-args` | `''` | Extra arguments, one per line. Maven only; use `gradle-args` for Gradle. |
 | `maven-opts` | `''` | `MAVEN_OPTS`. The forked build inherits it. Without a heap limit here or in the job's `MAVEN_OPTS` the action adds `-XX:MaxRAMPercentage=50`, half the runner's memory per JVM; an `-Xmx` in `.mvn/jvm.config` still wins. |
@@ -325,7 +325,7 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 | `manage-plugin-repository` | `auto` | `auto` (snapshot versions only), `always`, `never`. |
 | `plugin-repository-url` | Central snapshots | Where the plugin and its extension are resolved from. |
 | `time-machine-repositories` | `''` | Extra `id=url` lines for resolving the extension privately. |
-| `resolve-dependencies` | `false` | Run `dependency:go-offline` once up front to warm the local repository. Off by default: `go-offline` misses plugin-only dependencies and fails on some reactors. A failure is reported as a warning and the run continues. |
+| `resolve-dependencies` | `false` | Run `dependency:go-offline` once up front to warm the local repository. Off by default: `go-offline` misses plugin-only dependencies and fails on some reactors. A failure is reported as a warning and the run continues. Maven only. |
 
 ### Behaviour
 
@@ -333,7 +333,7 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 | --- | --- | --- |
 | `exclude-reverted-commits` | `true` | Analysing a revert also retroactively excludes what it reverted, so reverted work stops counting. |
 | `ignore-coverage` | `false` | Skip tests in the forked build. Much faster, no coverage data. Maven only in that sense: under Gradle the tasks are on the action's own command line, so this drops jacoco and the coverage analysis but does not stop the tests — use `gradle-tasks` for that. |
-| `time-machine` | `true` | Resolve a historical commit's snapshot dependencies as of that commit. |
+| `time-machine` | `true` | Resolve a historical commit's snapshot dependencies as of that commit. Maven only. |
 | `dump-analysis` | `true` | Write the submission document to disk. Without `analysis-output-directory` it lands in a runner temporary file and is not collected. |
 | `analysis-output-directory` | `''` | Where the dumped submission document is written. Point it inside the log directory to have it uploaded; one document per commit, so mind artifact size. Scoring is server-side here, so no local HTML report is produced. |
 | `stop-on-first-failure` | `true` | Stop at the first commit that genuinely fails to analyse (timeout, OOM, failed analysis run). Commits codiqo excludes do not count. A failure that halts the project in Codiqo stops the run either way. |
@@ -383,7 +383,7 @@ analysis cost against detail; none of them changes how effort is scored except w
 | `jdt-use-shared-index` | `true` | Reuse the shared language-server index across runs. Much faster; turn off to force a clean index. |
 | `jdt-include-decompiled-sources` | `false` | Let the language server decompile dependency classes without sources. Slower, and rarely changes blast radius. |
 | `jdt-lombok-agent` | `true` | Attach lombok to the language server so call hierarchy resolves the members lombok generates. Turn off for a project that does not use lombok: the agent also widens every caller lookup, which costs time and can reach a JDT failure. |
-| `jdt-source-exclusions` | `''` | Comma-separated groupId prefixes whose `-sources.jar` is removed before the language server imports. **Replaces** the default list, which covers the Scala and Kotlin families whose source jars stall the import. Extend it if a dependency of yours ships non-Java sources and the import hangs. |
+| `jdt-source-exclusions` | `''` | Comma-separated groupId prefixes whose `-sources.jar` is removed before the language server imports. **Replaces** the default list, which covers the Scala and Kotlin families whose source jars stall the import. Extend it if a dependency of yours ships non-Java sources and the import hangs. Maven only. |
 | `lsp-query-timeout-seconds` | `''` | Timeout for a single language-server query, such as a call-hierarchy lookup. |
 | `max-requests` | `''` | Maximum concurrent HTTP requests the engine issues. |
 | `max-requests-per-host` | `''` | Maximum concurrent HTTP requests per host. |

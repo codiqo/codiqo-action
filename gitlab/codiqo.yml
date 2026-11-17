@@ -52,7 +52,7 @@ spec:
       description: "Explicit JDK home for the Eclipse JDT language server alone (-Dcodiqo.jdtlsJavaHome), Java 25 or newer for jdt.ls 1.62.0 and later; it takes precedence over jdtls-java-version."
       default: ""
     build-tool:
-      description: "Which build tool drives the analysis: \"maven\" or \"gradle\". Gradle support does not cover the time machine or build-failure capture; see the Gradle section of the README."
+      description: "Which build tool drives the analysis: \"maven\" or \"gradle\". Gradle has no time machine, and ignores the inputs about the Maven goal's own build; see the Gradle section of the README."
       default: "maven"
     gradle-command:
       description: "Gradle executable, or \"auto\" to prefer the project wrapper (./gradlew) over a gradle on PATH. Gradle only."
@@ -61,7 +61,7 @@ spec:
       description: "Whitespace-separated tasks run before codiqoSubmitAnalysis on each commit, e.g. \"test\" or \":app:test :lib:test\". Empty analyses without running tests, so changed-code coverage stays empty. Gradle only."
       default: "test"
     gradle-project-properties:
-      description: "Newline-separated key=value pairs passed as -Pkey=value to every Gradle invocation, the Gradle counterpart of maven-user-properties. Never put secrets here; they would appear on the command line."
+      description: "Newline-separated key=value pairs passed as -Pkey=value to every Gradle invocation, the Gradle counterpart of maven-user-properties. Never put secrets here; they would appear on the command line. A Codiqo setting takes the same name as in maven-user-properties, such as codiqo.review.timeoutMinutes."
       default: ""
     gradle-args:
       description: "Extra Gradle arguments, one per line, the Gradle counterpart of maven-args. A single-line value is split on whitespace for convenience. Gradle only: maven-args is never passed to Gradle, since Maven flags such as -ntp or a -P profile mean something else there."
@@ -76,7 +76,7 @@ spec:
       description: "Apache Maven release to install from Maven Central and put first on PATH, so a commit is built by the same Maven on every run rather than whatever the runner image ships. The forked per-commit build inherits it unless maven-home names another. A project's ./mvnw still takes precedence under maven-command: auto. Set to an empty string to use the Maven already on PATH. Maven only."
       default: "3.9.16"
     maven-home:
-      description: "Maven home for the forked per-commit build (-Dcodiqo.mavenHome)."
+      description: "Maven home for the forked per-commit build (-Dcodiqo.mavenHome). Maven only."
       default: ""
     jdtls-version:
       description: "Eclipse JDT language server version (-Dcodiqo.jdtlsVersion). Leave empty to use the version the plugin ships with."
@@ -109,7 +109,7 @@ spec:
       description: "Wall-clock limit for analysing one commit before it is killed, enforced from outside the JVM. This is the outer deadline the build and test budgets are fitted under, so raising or lowering it moves them with it. Empty is the review limit plus 30 minutes with review on (180 by default) and 2h with it off; with review on, a smaller value is raised to that, with a warning."
       default: ""
     build-timeout-minutes:
-      description: "Limit for the forked build of a single commit (-Dcodiqo.buildTimeoutMinutes). It has to fire before per-commit-timeout, or the outer deadline kills the analysis before codiqo can record the commit as a build failure. Left empty it is three quarters of per-commit-timeout; a value that would not fit is clamped back to that, with a warning. The default of 90 fits under the default per-commit-timeout with the review on or off."
+      description: "Limit for the forked build of a single commit (-Dcodiqo.buildTimeoutMinutes). It has to fire before per-commit-timeout, or the outer deadline kills the analysis before codiqo can record the commit as a build failure. Left empty it is three quarters of per-commit-timeout; a value that would not fit is clamped back to that, with a warning. The default of 90 fits under the default per-commit-timeout with the review on or off. Maven only: under Gradle the build is the action's own command, held to per-commit-timeout."
       default: "90"
     test-timeout-minutes:
       description: "Limit for the test phase of the forked build (-Dcodiqo.testTimeoutMinutes). Clamped to three quarters of the build timeout, so a hung test phase is reaped while the build can still finish and report."
@@ -151,7 +151,7 @@ spec:
       description: "Additional id=url lines, one per line, added to the throwaway POM that resolves the time-machine extension. Credentials come from settings-xml, matched by repository id."
       default: ""
     resolve-dependencies:
-      description: "Run dependency:go-offline once before analysing, to warm the local repository and surface an unreachable repository as one clear warning; the run continues either way. Off by default because go-offline is imperfect: it misses dependencies reachable only through a plugin, and some reactors make it fail outright."
+      description: "Run dependency:go-offline once before analysing, to warm the local repository and surface an unreachable repository as one clear warning; the run continues either way. Off by default because go-offline is imperfect: it misses dependencies reachable only through a plugin, and some reactors make it fail outright. Maven only."
       default: "false"
     exclude-reverted-commits:
       description: "When a revert is analysed, also retroactively exclude the commit it reverted, so reverted work stops counting."
@@ -160,7 +160,7 @@ spec:
       description: "Skip tests in the forked build. Much faster and useful for a first trial, but produces no coverage data."
       default: "false"
     time-machine:
-      description: "Load the Codiqo time-machine core extension into the host Maven, so a historical commit resolves the snapshot dependencies it had at the time rather than the latest ones."
+      description: "Load the Codiqo time-machine core extension into the host Maven, so a historical commit resolves the snapshot dependencies it had at the time rather than the latest ones. Maven only."
       default: "true"
     dump-analysis:
       description: "Write the submission document the API receives to disk. On its own it lands in a temporary file that dies with the runner; set analysis-output-directory to somewhere you collect if you actually want to read it."
@@ -250,7 +250,7 @@ spec:
       description: "Attach lombok to the language server so call hierarchy resolves the members lombok generates. Turn off for a project that does not use lombok: the agent also widens every caller lookup, which costs time and can reach a JDT failure."
       default: "true"
     jdt-source-exclusions:
-      description: "Comma-separated groupId prefixes whose -sources.jar is removed from the local repository before the language server imports the project (-Dcodiqo.jdtSourceExclusions). REPLACES the default list rather than adding to it. The default covers the Scala and Kotlin dependency families whose source jars hang or crash the import; extend it (repeating the defaults you still want) if a dependency of yours ships non-Java sources and the import stalls."
+      description: "Comma-separated groupId prefixes whose -sources.jar is removed from the local repository before the language server imports the project (-Dcodiqo.jdtSourceExclusions). REPLACES the default list rather than adding to it. The default covers the Scala and Kotlin dependency families whose source jars hang or crash the import; extend it (repeating the defaults you still want) if a dependency of yours ships non-Java sources and the import stalls. Maven only."
       default: ""
     max-requests:
       description: "Maximum concurrent HTTP requests the engine issues."
