@@ -285,7 +285,7 @@ every commit is excluded. There are no other review switches. It works with Mave
 | Input | Default | Description |
 | --- | --- | --- |
 | `commit-window` | `3m` | `0`, `1m`, `3m`, `6m`, `1year`, or a raw ISO-8601 period such as `P2W`. |
-| `exclude-author-emails` | `''` | Comma-separated; a trailing `*` is allowed, e.g. `bot@*`. |
+| `exclude-author-emails` | `''` | Comma-separated; a trailing `*` is allowed, e.g. `bot@*`. Their commits are never built, reviewed or scored. A single-parent one is still indexed and recorded as excluded, so it can be named as the fix of a finding; a merge credited to such an author is not indexed. |
 | `include-author-emails` | `''` | Restrict analysis to these authors. |
 | `include-branches` | `''` | Comma-separated regex patterns; only commits on a matching branch are indexed and analysed. Applied while walking history, so a non-matching commit costs no build. |
 | `first-parent-only` | `true` | Measure a merge as what it brought to the target branch. |
