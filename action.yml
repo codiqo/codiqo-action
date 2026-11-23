@@ -99,7 +99,7 @@ inputs:
     required: false
     default: '3m'
   exclude-author-emails:
-    description: 'Comma-separated author emails to skip entirely; a trailing * is allowed, for example "bot@*". Useful for CI and bot accounts.'
+    description: 'Comma-separated author emails whose commits are never built, reviewed or scored; a trailing * is allowed, for example "bot@*". Useful for CI and bot accounts. Such an author''s single-parent commit is still indexed and recorded as excluded during the index step, so a finding it fixed can be marked fixed by it; a merge credited to such an author is not indexed.'
     required: false
     default: ''
   include-author-emails:
