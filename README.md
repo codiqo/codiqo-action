@@ -300,7 +300,7 @@ every commit is excluded. There are no other review switches. It works with Mave
 | `per-commit-timeout` | `''` | `30m`, `1h`, `90m`, `2h`, or raw minutes. The outer deadline everything else is fitted under. Empty is `review-timeout-minutes` plus 30 with `review` on (180 by default) and `2h` with it off; with `review` on, a smaller value is raised to that, with a warning. |
 | `build-timeout-minutes` | `90` | Forked build of one commit. It must fit inside three quarters of `per-commit-timeout`, so a larger value is clamped back to that with a warning; the default fits with `review` on or off. Empty uses that three quarters. Maven only. |
 | `test-timeout-minutes` | `30` | Test phase of the forked build. Clamped to three quarters of the build timeout. |
-| `per-test-timeout` | `15m` | One JUnit 5 test method; `off` disables. Capped at 15 minutes and at half the test-phase budget. |
+| `per-test-timeout` | `15m` | One JUnit 5 test or lifecycle method, interrupted on its own thread; `off` disables. A test that ignores the interrupt runs until `test-timeout-minutes` ends its test JVM, and the commit's score is held. Capped at 15 minutes and at half the test-phase budget. |
 | `import-timeout-minutes` | `15` | Language server project import. Raise for a large reactor. |
 | `api-connect-timeout-seconds` | `30` | |
 | `api-read-timeout-seconds` | `60` | |
@@ -340,7 +340,7 @@ not fit — so lowering `per-commit-timeout` shortens the run instead of failing
 | `require-full-history` | `true` | Refuse to run on a shallow or filtered clone. |
 | `skip-on-build-failure` | `true` | Record a commit whose build fails as an exclusion. Turn off and a failed or timed-out build fails the step instead. |
 | `fail-on-uninstrumented-module` | `true` | Fail when a module with tests produced no coverage data, which usually means the coverage agent never attached. |
-| `test-failure-hold-share` | (plugin default 0.75) | Hold the commit's score until someone accepts it in Codiqo when at least this share of executed tests fail: the commit broke what its tests share, or the analysis could not rebuild their environment. The commit is still reviewed and scored. `1` or more turns the check off, for tests that need a database or Docker the CI lacks. |
+| `test-failure-hold-share` | (plugin default 0.75) | Hold the commit's score until someone accepts it in Codiqo when at least this share of executed tests fail: the commit broke what its tests share, or the analysis could not rebuild their environment. The commit is still reviewed and scored. `1` or more turns the check off, and the hold of a test run the test-phase timeout cut short with it, for tests that need a database or Docker the CI lacks. |
 | `test-failure-hold-min-tests` | (plugin default 20) | Fewer executed tests than this never hold a score. |
 | `test-failure-halt-share` / `test-failure-halt-min-tests` | `''` | Deprecated former names of the two inputs above, used when those are empty. |
 | `fail-on-jdtls-error` | `false` | Fail when the language server reports an error during import. Off by default: an import warning usually degrades blast-radius data rather than invalidating the analysis. |

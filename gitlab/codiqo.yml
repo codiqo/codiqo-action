@@ -115,7 +115,7 @@ spec:
       description: "Limit for the test phase of the forked build (-Dcodiqo.testTimeoutMinutes). Clamped to three quarters of the build timeout, so a hung test phase is reaped while the build can still finish and report."
       default: "30"
     per-test-timeout:
-      description: "Limit for a single JUnit 5 test method, so one hanging test cannot fail the whole build. Accepts off, 5m, 10m, 15m, or raw minutes; capped at 15 minutes and at half the test-phase budget. JUnit 4 and TestNG are unaffected."
+      description: "Limit for a single JUnit 5 test or lifecycle method (@BeforeAll, @BeforeEach and the like), so one hanging test cannot fail the whole build. The test keeps its own thread and is interrupted at the limit; a test stuck in something that ignores the interrupt (a blocking socket read, a deadlock) runs until test-timeout-minutes ends its test JVM, and the commit is then scored with its score held until someone accepts it. Accepts off, 5m, 10m, 15m, or raw minutes; capped at 15 minutes and at half the test-phase budget. JUnit 4 and TestNG are unaffected."
       default: "15m"
     import-timeout-minutes:
       description: "Limit for the language server to import the project (-Dcodiqo.importTimeoutMinutes). Raise it for a very large reactor."
@@ -178,7 +178,7 @@ spec:
       description: "Fail when a module produced no coverage data, which usually means the coverage agent was not attached. Turn off for reactors where some modules legitimately run no tests."
       default: "true"
     test-failure-hold-share:
-      description: "Hold the commit's score out of every figure until someone accepts it in Codiqo when at least this share of executed tests fail: the commit broke what its tests share, or the analysis could not rebuild their environment. The commit is still reviewed and scored. 1 or more turns the check off, for a project whose tests need a database or Docker the CI does not have. Empty keeps the plugin default (0.75)."
+      description: "Hold the commit's score out of every figure until someone accepts it in Codiqo when at least this share of executed tests fail: the commit broke what its tests share, or the analysis could not rebuild their environment. The commit is still reviewed and scored. 1 or more turns the check off, and the hold of a test run the test-phase timeout cut short with it, for a project whose tests need a database or Docker the CI does not have. Empty keeps the plugin default (0.75)."
       default: ""
     test-failure-hold-min-tests:
       description: "Fewer executed tests than this never hold a score. Empty keeps the plugin default (20)."
